@@ -1,0 +1,255 @@
+<meta charset="utf-8">
+<title>Shellwork</title>
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="icon" href="icons/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650;700&family=Noto+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="canvas.css">
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3.5v9M3.5 8h9" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 16 16"><path d="M8 1.8l1.5 3.9 3.9 1.5-3.9 1.5L8 12.6 6.5 8.7 2.6 7.2l3.9-1.5zM12.6 10.8l.6 1.5 1.5.6-1.5.6-.6 1.5-.6-1.5-1.5-.6 1.5-.6z" fill="currentColor"/></symbol>
+  <symbol id="i-more" viewBox="0 0 16 16"><circle cx="3.5" cy="8" r="1.2" fill="currentColor"/><circle cx="8" cy="8" r="1.2" fill="currentColor"/><circle cx="12.5" cy="8" r="1.2" fill="currentColor"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 16 16"><path d="M4.5 6.5L8 10l3.5-3.5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-grip" viewBox="0 0 16 16"><g fill="currentColor"><circle cx="6" cy="4" r="1.1"/><circle cx="10" cy="4" r="1.1"/><circle cx="6" cy="8" r="1.1"/><circle cx="10" cy="8" r="1.1"/><circle cx="6" cy="12" r="1.1"/><circle cx="10" cy="12" r="1.1"/></g></symbol>
+  <symbol id="i-gripx" viewBox="0 0 16 16"><g fill="currentColor"><circle cx="4" cy="6" r="1.1"/><circle cx="8" cy="6" r="1.1"/><circle cx="12" cy="6" r="1.1"/><circle cx="4" cy="10" r="1.1"/><circle cx="8" cy="10" r="1.1"/><circle cx="12" cy="10" r="1.1"/></g></symbol>
+  <symbol id="i-export" viewBox="0 0 16 16"><path d="M8 2.5v7.5M5 7l3 3 3-3M3 12.5h10" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-paste" viewBox="0 0 16 16"><rect x="3.5" y="3" width="9" height="11" rx="2" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M6 3V2.2h4V3M6 7h4M6 9.8h2.6" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round"/></symbol>
+  <symbol id="i-side" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M6.2 3.2v9.6" stroke="currentColor" stroke-width="1.3"/></symbol>
+  <symbol id="i-fit" viewBox="0 0 16 16"><path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-canvas" viewBox="0 0 16 16"><rect x="2" y="2.5" width="6" height="5" rx="1.3" stroke="currentColor" stroke-width="1.3" fill="none"/><rect x="8.5" y="9" width="5.5" height="4.5" rx="1.3" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M5 7.5v3.5h3.5" stroke="currentColor" stroke-width="1.3" fill="none"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 16 16"><rect x="3" y="2" width="10" height="12" rx="1.8" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M5.5 5.5h5M5.5 8h5M5.5 10.5h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+  <symbol id="i-map" viewBox="0 0 16 16"><circle cx="3.5" cy="8" r="1.8" stroke="currentColor" stroke-width="1.3" fill="none"/><circle cx="12.5" cy="3.5" r="1.6" stroke="currentColor" stroke-width="1.3" fill="none"/><circle cx="12.5" cy="12.5" r="1.6" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M5.3 7.6C8 7 8.5 4 10.9 3.7M5.3 8.4C8 9 8.5 12 10.9 12.3" stroke="currentColor" stroke-width="1.3" fill="none"/></symbol>
+  <symbol id="i-help" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M6.4 6.3a1.7 1.7 0 113 1.1c-.7.4-1.4.8-1.4 1.7" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round"/><circle cx="8" cy="11.3" r=".8" fill="currentColor"/></symbol>
+  <symbol id="i-close" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+  <symbol id="i-play" viewBox="0 0 16 16"><path d="M5 3.2v9.6L12.6 8z" fill="currentColor"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 16 16"><path d="M2.5 5.5A1.5 1.5 0 014 4h1.6l1-1.4h2.8l1 1.4H12a1.5 1.5 0 011.5 1.5v6A1.5 1.5 0 0112 13H4a1.5 1.5 0 01-1.5-1.5z" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"/><circle cx="8" cy="8.5" r="2.3" stroke="currentColor" stroke-width="1.3" fill="none"/></symbol>
+  <symbol id="i-cursor" viewBox="0 0 16 16"><path d="M4 2.5l8.5 5.2-3.9.9-1.9 3.7z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></symbol>
+  <symbol id="i-hand" viewBox="0 0 16 16"><path d="M5.5 8.5V4a1 1 0 012 0v3.5M7.5 7V3a1 1 0 012 0v4M9.5 7V3.8a1 1 0 012 0V9c0 2.8-1.7 4.5-4.2 4.5-1.8 0-2.7-.8-3.6-2.2L2.4 8.9a1 1 0 011.6-1.1l1.5 1.4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-shell" viewBox="0 0 16 16"><rect x="2.5" y="3" width="11" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5 6h6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+  <symbol id="i-text" viewBox="0 0 16 16"><path d="M3.5 4V3h9v1M8 3v10M6 13h4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.6" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M10.4 10.4L13.5 13.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+  <symbol id="i-command" viewBox="0 0 16 16"><path d="M6 6V4.5A1.5 1.5 0 104.5 6H6zm0 0h4m-4 0v4m4-4V4.5A1.5 1.5 0 1111.5 6H10zm0 0v4m0 0h1.5A1.5 1.5 0 1110 11.5V10zm0 0H6m0 0v1.5A1.5 1.5 0 114.5 10H6z" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linejoin="round"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.8" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M8 4.8V8l2.2 1.4" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-order" viewBox="0 0 16 16"><path d="M6.5 4.5h7M6.5 8h7M6.5 11.5h7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M2.6 3.6l.9-.6v3M2.4 9.6c.2-.5.6-.8 1.1-.8.6 0 1 .4 1 .9 0 .9-2.1 1.5-2.1 2.6h2.2" stroke="currentColor" stroke-width="1.1" fill="none" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-send" viewBox="0 0 16 16"><path d="M8 13V3.5M4 7l4-4 4 4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</svg>
+
+<div id="app" class="app">
+  <aside id="sidebar" class="sidebar" aria-label="보드와 개요">
+    <div class="side-head">
+      <div class="brand">
+        <img class="brand-icon" src="icons/icon.svg" alt="" width="22" height="22">
+        <span>Shellwork</span>
+      </div>
+      <button id="sideClose" class="icon-btn" data-tip="사이드바 닫기" data-kbd="Mod+\" aria-label="사이드바 닫기"><svg><use href="#i-side"/></svg></button>
+    </div>
+    <button class="side-search" data-open-palette><svg><use href="#i-search"/></svg><span>검색과 명령</span><span data-kbd-label="Mod+K"></span></button>
+    <button id="boardBtn" class="board-btn" aria-haspopup="menu" aria-expanded="false">
+      <span class="board-label">보드</span>
+      <span id="boardName" class="board-name">불러오는 중</span>
+      <svg><use href="#i-chev"/></svg>
+    </button>
+    <div id="boardMenu" class="menu" role="menu" hidden></div>
+    <div class="side-label"><span>개요</span><span id="shellCount" class="count"></span></div>
+    <nav id="outline" class="outline" aria-label="개요"></nav>
+    <div class="side-foot"><span class="save-dot" aria-hidden="true"></span><span id="saveState" class="save-state"></span><button id="dataGuideBtn" class="foot-link">데이터·AI 안내</button></div>
+  </aside>
+  <div id="sideScrim" class="side-scrim" hidden></div>
+
+  <main class="stage">
+    <div class="stage-top">
+      <div class="top-left">
+        <div id="focusBar" class="focus-bar floating" hidden><button id="focusExit" data-tip="전체 보기" data-kbd="Esc" aria-label="전체 보기">‹</button><nav id="focusCrumbs" class="crumbs" aria-label="지금 위치"></nav></div>
+        <button id="sideOpen" class="icon-btn floating" data-tip="사이드바 열기" data-kbd="Mod+\" aria-label="사이드바 열기"><svg><use href="#i-side"/></svg></button>
+      </div>
+      <div class="view-switch floating" role="tablist" aria-label="보기">
+        <button role="tab" data-view="canvas" aria-selected="true" data-tip="캔버스" data-kbd="1"><svg><use href="#i-canvas"/></svg><span>캔버스</span></button>
+        <button role="tab" data-view="doc" aria-selected="false" data-tip="문서로 읽기" data-kbd="2"><svg><use href="#i-doc"/></svg><span>문서</span></button>
+        <button role="tab" data-view="map" aria-selected="false" data-tip="마인드맵" data-kbd="3"><svg><use href="#i-map"/></svg><span>마인드맵</span></button>
+      </div>
+      <div class="top-right">
+        <div id="peers" class="peers" hidden></div>
+        <div class="tb-group floating">
+          <button id="presentBtn" class="tb-btn" data-tip="발표 모드" data-kbd="P"><svg><use href="#i-play"/></svg><span>발표</span></button>
+          <span class="tb-sep"></span>
+          <button id="historyBtn" class="tb-btn icon" data-tip="버전 기록" data-kbd="Shift+H" aria-label="버전 기록"><svg><use href="#i-clock"/></svg></button>
+          <button id="exportBtn" class="tb-btn icon" data-tip="마크다운으로 내보내기" data-kbd="Mod+Shift+E" aria-label="내보내기"><svg><use href="#i-export"/></svg></button>
+          <button class="tb-btn icon" data-open-palette data-tip="검색과 명령" data-kbd="Mod+K" aria-label="검색과 명령"><svg><use href="#i-command"/></svg></button>
+        </div>
+        <button id="aiBtn" class="pill ai" data-tip="AI 도우미 · 고른 것을 보내려면" data-kbd="Mod+L"><svg><use href="#i-spark"/></svg><span>AI</span></button>
+      </div>
+    </div>
+
+    <section id="canvasView" class="view">
+      <div id="viewport" class="viewport">
+        <div id="world" class="world">
+          <div id="sectionLayer"></div>
+          <svg id="wires" class="wires">
+            <defs>
+              <marker id="ah" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M1 1.2L9 5L1 8.8" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></marker>
+              <marker id="ah-sel" class="sel" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M1 1.2L9 5L1 8.8" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></marker>
+            </defs>
+            <g id="wireLayer"></g>
+            <path id="tempWire" class="temp" d="" />
+          </svg>
+          <div id="shellLayer"></div>
+          <div id="ghostLayer"></div>
+          <svg id="guideLayer" class="guides"></svg>
+        </div>
+        <div id="cursorLayer" class="cursor-layer"></div>
+        <div id="marquee" class="marquee" hidden></div>
+      </div>
+      <div id="emptyHint" class="empty-hint" hidden>
+        <strong>빈 캔버스예요</strong>
+        <span>빈 곳을 더블클릭해 생각나는 대로 적거나, 메모를 통째로 붙여 넣어 보세요. 조각들을 골라 "셸로 감싸기"로 묶으면 구조가 생겨요.</span>
+      </div>
+      <div id="guide" class="guide floating" hidden>
+        <div class="guide-head"><strong>처음이라면 이렇게 해 보세요</strong><span id="guideCount" class="guide-count"></span><button id="guideClose" class="icon-btn" aria-label="안내 닫기" data-tip="안내 닫기"><svg><use href="#i-close"/></svg></button></div>
+        <div id="guideList"></div>
+      </div>
+      <div class="dock floating" role="toolbar" aria-label="캔버스 도구">
+        <button class="dock-btn icon" data-tool="select" aria-pressed="true" data-tip="선택" data-kbd="V" aria-label="선택"><svg><use href="#i-cursor"/></svg></button>
+        <button class="dock-btn icon" data-tool="hand" aria-pressed="false" data-tip="화면 이동 · 스페이스를 누른 채 끌어도 돼요" data-kbd="H" aria-label="화면 이동"><svg><use href="#i-hand"/></svg></button>
+        <span class="dock-sep"></span>
+        <button id="addShellBtn" class="dock-btn icon" data-tip="새 셸" data-kbd="S" aria-label="새 셸"><svg><use href="#i-shell"/></svg></button>
+        <button id="addTextBtn" class="dock-btn icon" data-tip="새 글 · 빈 곳 더블클릭" data-kbd="T" aria-label="새 글"><svg><use href="#i-text"/></svg></button>
+        <button id="pasteBtn" class="dock-btn icon" data-tip="글 붙여 넣어 펼치기" data-kbd="Mod+V" aria-label="글 붙여 넣기"><svg><use href="#i-paste"/></svg></button>
+        <button id="photoBtn" class="dock-btn icon photo-cta" data-tip="사진을 셸로 정리" aria-label="사진을 셸로"><svg><use href="#i-camera"/></svg></button>
+        <input id="photoInput" type="file" accept="image/*" multiple hidden>
+        <span class="dock-sep"></span>
+        <button id="organizeBtn" class="dock-btn ai" data-tip="흩어진 조각을 AI가 묶어 줘요"><svg><use href="#i-spark"/></svg><span class="label">AI 구조화</span></button>
+        <span class="dock-sep"></span>
+        <button id="orderBtn" class="dock-btn icon" aria-pressed="false" data-tip="문서 순서 번호" data-kbd="O" aria-label="문서 순서 번호"><svg><use href="#i-order"/></svg></button>
+        <button id="zoomOut" class="dock-btn icon" data-tip="축소" data-kbd="-" aria-label="축소">−</button>
+        <button id="zoomReset" class="dock-btn zoom" data-tip="100%로" data-kbd="0">100%</button>
+        <button id="zoomIn" class="dock-btn icon" data-tip="확대" data-kbd="+" aria-label="확대">+</button>
+        <button id="zoomFit" class="dock-btn icon" data-tip="전체 보기" data-kbd="Shift+1" aria-label="전체 보기"><svg><use href="#i-fit"/></svg></button>
+        <span class="dock-sep"></span>
+        <button id="helpBtn" class="dock-btn icon" data-tip="단축키" data-kbd="?" aria-label="단축키"><svg><use href="#i-help"/></svg></button>
+      </div>
+    </section>
+
+    <div id="selBar" class="sel-bar floating" role="toolbar" aria-label="선택한 항목" hidden></div>
+
+    <section id="docView" class="view doc-view" hidden>
+      <article id="docBody" class="doc"></article>
+    </section>
+
+    <section id="mapView" class="view map-view" hidden>
+      <div class="map-bar">
+        <label for="mapRoot">중심</label>
+        <select id="mapRoot"></select>
+        <button id="mapGo" class="chip">캔버스에서 보기</button>
+        <span class="note">클릭 고르기 · Tab 하위 추가 · Enter 형제 추가 · F2·더블클릭 이름 · Del 삭제 · 방향키 이동</span>
+      </div>
+      <div class="map-scroll"><svg id="mapSvg"></svg></div>
+    </section>
+
+    <div id="presentUI" class="present-ui" hidden>
+      <div class="present-progress"><i id="presentFill"></i></div>
+      <div id="presentHit" class="present-hit"></div>
+      <div id="presentNotes" class="present-notes floating" hidden>
+        <div class="notes-head"><span>발표 대본</span><button id="notesGen" class="chip ai">AI로 대본 만들기</button></div>
+        <p id="notesText"></p>
+      </div>
+      <div class="present-bar floating" role="toolbar" aria-label="발표">
+        <button id="presPrev" class="dock-btn icon" data-tip="이전" data-kbd="←" aria-label="이전">‹</button>
+        <span id="presCount" class="pres-count">1 / 1</span>
+        <button id="presNext" class="dock-btn icon" data-tip="다음" data-kbd="→ / Space" aria-label="다음">›</button>
+        <span class="dock-sep"></span>
+        <span id="presTitle" class="pres-title"></span>
+        <span class="dock-sep"></span>
+        <button id="presNotes" class="dock-btn" data-tip="발표 대본" data-kbd="N">대본</button>
+        <button id="presExit" class="dock-btn" data-tip="발표 끝내기" data-kbd="Esc">끝내기</button>
+      </div>
+    </div>
+
+    <aside id="aiPanel" class="ai-panel" hidden aria-label="AI 도우미">
+      <div class="ai-head">
+        <span class="ai-badge"><svg><use href="#i-spark"/></svg></span>
+        <h2>AI 도우미</h2>
+        <button id="aiClose" class="icon-btn" data-tip="닫기" aria-label="닫기"><svg><use href="#i-close"/></svg></button>
+      </div>
+      <p id="aiOff" class="ai-off" hidden>AI 기능은 claude.ai에 게시된 페이지에서 내 Claude 계정으로 동작해요. 이 화면에서는 캔버스와 문서 편집만 쓸 수 있어요. <a href="https://claude.ai/artifact/8iQWLuStXZsvzAGe8mooXV" target="_blank" rel="noopener">AI가 되는 버전 열기</a></p>
+      <div class="ai-quick">
+        <button class="chip" data-board-action="organize">흩어진 셸 구조화</button>
+        <button class="chip" data-board-action="fill">빈 본문 채우기</button>
+        <button class="chip" data-board-action="critique">논리 빈틈 찾기</button>
+      </div>
+      <div id="aiLog" class="ai-log">
+        <div class="ai-empty">
+          <p>보드 전체를 읽고 답해요. 답변 카드는 캔버스로 끌어 놓으면 셸이 됩니다.</p>
+          <p class="ai-try">이렇게 물어보세요</p>
+          <ul>
+            <li>이 주제로 발표 순서를 짜 줘</li>
+            <li>빠진 근거가 뭐가 있을까?</li>
+            <li>결론 셸 초안을 써 줘</li>
+          </ul>
+        </div>
+      </div>
+      <div id="aiChips" class="ai-chips" hidden></div>
+      <form id="aiForm" class="ai-form">
+        <textarea id="aiInput" rows="2" placeholder="보드에 대해 물어보세요"></textarea>
+        <button id="aiSend" class="pill ai" type="submit">보내기</button>
+      </form>
+    </aside>
+  </main>
+
+  <div id="shellMenu" class="menu" role="menu" hidden></div>
+  <div id="tip" role="tooltip" hidden></div>
+  <div id="palette" class="palette-wrap" hidden>
+    <div class="palette" role="dialog" aria-label="검색과 명령">
+      <div class="pal-input"><svg><use href="#i-search"/></svg><input id="palInput" type="text" placeholder="명령이나 셸 이름을 입력하세요 (초성도 돼요)" autocomplete="off" spellcheck="false" aria-label="검색"><span data-kbd-label="Esc"></span></div>
+      <div id="palList" class="pal-list" role="listbox" aria-label="결과"></div>
+    </div>
+  </div>
+  <div id="history" class="sheet-wrap" hidden>
+    <div class="sheet hist" role="dialog" aria-labelledby="histTitle">
+      <div class="sheet-head"><h2 id="histTitle">버전 기록</h2><button id="histClose" class="icon-btn" aria-label="닫기"><svg><use href="#i-close"/></svg></button></div>
+      <p class="hist-note">작업하는 동안 10분마다 자동으로 남아요. 중요한 순간에는 이름을 붙여 남겨 두세요. 되돌린 뒤에도 실행 취소로 되돌릴 수 있어요.</p>
+      <div class="hist-new"><input id="histLabel" type="text" placeholder="예: 가설 고치기 전, 중간 발표 버전" maxlength="80" aria-label="버전 이름"><button id="histSave" class="btn primary">지금 버전 남기기</button></div>
+      <div id="histList" class="hist-list"></div>
+    </div>
+  </div>
+  <div id="keysheet" class="sheet-wrap" hidden>
+    <div class="sheet" role="dialog" aria-labelledby="sheetTitle">
+      <div class="sheet-head">
+        <h2 id="sheetTitle">단축키</h2>
+        <div class="sheet-motion" role="group" aria-label="애니메이션"><span>애니메이션</span><button data-motion-pick="smooth">부드럽게</button><button data-motion-pick="bouncy">통통 튀게</button><button data-motion-pick="off">끄기</button></div>
+        <button id="sheetClose" class="icon-btn" aria-label="닫기"><svg><use href="#i-close"/></svg></button>
+      </div>
+      <div id="sheetBody" class="sheet-grid"></div>
+      <p class="sheet-foot">무엇이든 <span data-kbd-label="Mod+K"></span> 로 찾아 실행할 수 있어요</p>
+    </div>
+  </div>
+  <div id="toast" class="toast" role="status" hidden></div>
+  <div id="modal" class="modal" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <h2 id="modalTitle"></h2>
+      <p id="modalText"></p>
+      <div id="modalNode" hidden></div>
+      <img id="modalImg" class="modal-img" alt="출처 사진" hidden>
+      <textarea id="modalArea" hidden></textarea>
+      <div id="modalActions" class="modal-actions"></div>
+    </div>
+  </div>
+</div>
+
+<script src="js/store.js" charset="utf-8"></script>
+<script src="js/persist.js" charset="utf-8"></script>
+<script src="js/motion.js" charset="utf-8"></script>
+<script src="js/collab.js" charset="utf-8"></script>
+<script src="js/md.js" charset="utf-8"></script>
+<script src="js/canvas.js" charset="utf-8"></script>
+<script src="js/input.js" charset="utf-8"></script>
+<script src="js/doc.js" charset="utf-8"></script>
+<script src="js/present.js" charset="utf-8"></script>
+<script src="js/ai.js" charset="utf-8"></script>
+<script src="js/history.js" charset="utf-8"></script>
+<script src="js/docx.js" charset="utf-8"></script>
+<script src="js/keys.js" charset="utf-8"></script>
+<script src="js/main.js" charset="utf-8"></script>

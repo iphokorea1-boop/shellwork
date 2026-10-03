@@ -1,0 +1,5 @@
+# Notes and local tooling that are not part of the app
+research_notes/
+reports/
+.claude/
+_site/

@@ -1,0 +1,43 @@
+# Publishes the app to GitHub Pages on every push to main.
+# index.html is written without <!doctype>/<head> because the claude.ai artifact adds them,
+# so the build wraps it in a full document for the standalone site.
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build site
+        run: |
+          mkdir -p _site
+          cp -r style.css canvas.css js icons _site/
+          {
+            echo '<!doctype html>'
+            echo '<html lang="ko">'
+            sed '1a <meta name="viewport" content="width=device-width, initial-scale=1">' index.html
+            echo '</html>'
+          } > _site/index.html
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+      - id: deployment
+        uses: actions/deploy-pages@v4
