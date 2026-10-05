@@ -28,7 +28,8 @@
   }
   function ensure() {
     if (A.sample && !A.disabled) return true;
-    SW.ui.toast(A.disabled ? '이 화면에서는 AI를 쓸 수 없어요.' : 'AI는 claude.ai에 게시된 페이지에서 동작해요. 지금은 편집만 할 수 있어요.');
+    if (!window.claude) SW.ui.toast('AI는 claude.ai의 Shellwork에서 동작해요.', 'AI 버전으로 옮기기', SW.transfer.moveDialog);
+    else SW.ui.toast(A.disabled ? '이 화면에서는 AI를 쓸 수 없어요.' : 'AI를 쓸 수 없는 상태예요. 페이지를 새로 고쳐 주세요.');
     return false;
   }
 
@@ -582,26 +583,41 @@
       '너는 고등학생의 연구 발표 자료를 만드는 발표 디자이너야. ' + LANG,
       '아래 보드로 발표 슬라이드 ' + (DECK_LEN[len] || DECK_LEN.normal) + '를 구성해.',
       '',
-      '규칙:',
-      '- 첫 장은 "cover"(제목, 부제), 마지막 장은 "closing". 큰 단락이 바뀌는 곳에는 "section"을 써도 돼.',
-      '- "bullets": 요점 3~5개, 한 줄에 40자 이내의 개조식. 필요하면 {"text": "...", "sub": ["..."]}로 하위 요점 2개까지.',
+      '슬라이드 종류 (같은 종류만 이어지지 않게 섞어서, 글이 적고 시원하게):',
+      '- "cover": 첫 장. title은 청중이 궁금해할 한 문장, subtitle은 연구 주제.',
+      '- "agenda": 둘째 장. items에 큰 단락 3~6개.',
+      '- "section": 큰 단락이 시작될 때 (선택). title과 짧은 subtitle.',
+      '- "statement": 연구 질문, 가설, 핵심 결론처럼 한 문장을 크게 보여 줄 때. text에 그 문장(60자 이내).',
+      '- "cards": 나란히 놓고 비교하거나 묶어 보여 줄 2~4가지(조건, 단계, 변인, 장단점). cards: [{"title": "짧은 이름", "text": ["요점", "요점"]}], 카드마다 요점 1~3개.',
+      '- "bullets": 요점 3~5개, 한 줄 40자 이내 개조식. 필요하면 {"text": "...", "sub": ["..."]}로 하위 요점 2개까지.',
       '- "table": 보드에 비교나 수치가 있을 때만. 값은 보드 그대로, 행은 8개 이하.',
       '- "image": 보드에 있는 그림 id만 "image"에 써. 그림 옆에 요점 0~3개, "caption"에 짧은 설명.',
+      '- "closing": 마지막 장.',
+      '규칙:',
+      '- 슬라이드 title은 주제어 대신 그 장의 메시지를 담은 짧은 문장으로 써도 좋아(예: "정오에 차이가 가장 컸다").',
+      '- cover·agenda·closing을 뺀 장에는 "tag"로 속한 큰 단락을 써(예: "02  측정 방법"; 번호는 agenda 순서).',
       '- 모든 장에 "notes": 발표자가 말할 대본 2~4문장("~습니다" 말투, 슬라이드 글을 그대로 읽지 말 것).',
       '- 보드에 없는 사실이나 수치를 지어내지 마.',
       extra ? '- 추가 요청: ' + extra : '',
       '',
-      'JSON만 답해: {"title": "...", "subtitle": "...", "slides": [{"type": "cover|section|bullets|table|image|closing", "title": "...", "subtitle": "", "bullets": ["..."], "table": {"header": ["..."], "rows": [["..."]]}, "image": "그림id", "caption": "", "notes": "..."}]}',
+      'JSON만 답해: {"title": "...", "subtitle": "...", "slides": [{"type": "cover|agenda|section|statement|cards|bullets|table|image|closing", "tag": "", "title": "...", "subtitle": "", "text": "", "items": ["..."], "cards": [{"title": "...", "text": ["..."]}], "bullets": ["..."], "table": {"header": ["..."], "rows": [["..."]]}, "image": "그림id", "caption": "", "notes": "..."}]} (각 장에는 그 종류에 필요한 칸만 넣어)',
       '',
       '보드:',
       A.fullOutline(),
     ].join(NL), { modelTier: 'default' });
     if (!r || !Array.isArray(r.slides) || !r.slides.length) throw { code: 'invalid_json' };
-    const TYPES = ['cover', 'section', 'bullets', 'table', 'image', 'closing'];
+    const TYPES = ['cover', 'agenda', 'section', 'statement', 'cards', 'bullets', 'table', 'image', 'closing'];
     const slides = r.slides.slice(0, 30).map((d) => {
       if (!d || typeof d !== 'object') return null;
-      const o = { type: TYPES.includes(d.type) ? d.type : 'bullets', title: clean(d.title || '', 90), subtitle: clean(d.subtitle || '', 140), notes: clean(d.notes || '', 1200) };
+      const o = { type: TYPES.includes(d.type) ? d.type : 'bullets', tag: clean(d.tag || '', 30), title: clean(d.title || '', 90), subtitle: clean(d.subtitle || '', 140), notes: clean(d.notes || '', 1200) };
       o.bullets = (Array.isArray(d.bullets) ? d.bullets : []).slice(0, 8).map((b) => (typeof b === 'string' ? { text: clean(b, 120) } : b && b.text ? { text: clean(b.text, 120), sub: (Array.isArray(b.sub) ? b.sub : []).slice(0, 4).map((x) => clean(x, 100)) } : null)).filter(Boolean);
+      if (o.type === 'agenda') { o.items = (Array.isArray(d.items) ? d.items : o.bullets.map((b) => b.text)).slice(0, 8).map((x) => clean(x, 50)).filter(Boolean); if (!o.items.length) o.type = 'bullets'; }
+      if (o.type === 'statement') { o.text = clean(d.text || (o.bullets[0] && o.bullets[0].text) || '', 160); if (!o.text) o.type = 'bullets'; }
+      if (o.type === 'cards') {
+        o.cards = (Array.isArray(d.cards) ? d.cards : []).slice(0, 4).filter((c) => c && c.title)
+          .map((c) => ({ title: clean(c.title, 40), text: (Array.isArray(c.text) ? c.text : c.text ? [c.text] : []).slice(0, 4).map((x) => clean(x, 90)) }));
+        if (o.cards.length < 2) { o.type = 'bullets'; if (!o.bullets.length) o.bullets = o.cards.map((c) => ({ text: c.title, sub: c.text })); }
+      }
       if (o.type === 'table') { const rows = tableRows(d.table); if (rows) o.table = rows; else o.type = 'bullets'; }
       if (o.type === 'image') { const id = String(d.image || '').replace(/^\[\[그림:|\]\]$/g, ''); if (imgs.has(id)) { o.image = id; o.caption = clean(d.caption || '', 160); } else o.type = 'bullets'; }
       return o;

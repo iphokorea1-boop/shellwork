@@ -255,6 +255,11 @@
       { label: 'R&E 중간 보고', meta: '한 일·결과·문제·계획', act: () => newBoard('mid') },
       { label: 'R&E 최종 보고서', meta: '초록부터 결론까지', act: () => newBoard('final') },
       { label: '연구 발표 템플릿', meta: '발표 순서', act: () => newBoard('talk') },
+      '-', { heading: '보드 파일' },
+      { label: '이 보드 내보내기', meta: '.shellwork.json', act: SW.transfer.exportBoard },
+      { label: '모든 보드 내보내기', meta: '백업', act: SW.transfer.exportAll },
+      { label: '보드 파일 가져오기', act: SW.transfer.pickFile },
+      { label: window.claude ? '웹사이트로 옮기기' : 'AI 버전으로 옮기기', act: SW.transfer.moveDialog },
       '-', { label: '버전 기록', meta: SW.keys.fmt('Shift+H'), act: () => SW.history.open() }, { label: '이 보드 이름 바꾸기', act: renameBoard });
     if (P.mode === 'cloud' && !S.board.shared && !S.board.example) items.push({ label: '친구와 함께 쓰기…', act: shareBoard });
     if (!S.board.example) items.push({ label: '이 보드 삭제', danger: true, act: deleteBoard });
@@ -315,10 +320,15 @@
       { label: 'AI로 글 쓰기', meta: '보고서·설명글·요약', act: main.writeDialog },
       { label: 'Word로 저장 (.docx)', meta: '보드 그대로', act: main.exportWord },
       { label: '마크다운 보기·복사', act: exportMd },
+      '-', { heading: '보드 파일 (.shellwork.json)' },
+      { label: '이 보드를 파일로 내보내기', meta: '사진 포함', act: SW.transfer.exportBoard },
+      { label: '보드 파일 가져오기', act: SW.transfer.pickFile },
+      { label: window.claude ? '이 보드를 웹사이트로 옮기기' : '이 보드를 AI 버전으로 옮기기', act: SW.transfer.moveDialog },
       '-', { heading: '가져오기' },
       { label: '글·md 파일을 셸 구조로', meta: '관계선·표', act: () => main.importDialog() },
     ]);
   }
+  main.openImported = (b) => { main.setView('canvas'); openBoard(b); requestAnimationFrame(() => C.fit()); };
 
   /* ---------- text and Markdown files → shells ---------- */
   main.isTextFile = (f) => /\.(md|markdown|txt|text)$/i.test(f.name || '') || /^text\/(plain|markdown|x-markdown)/.test(f.type || '');
@@ -346,7 +356,7 @@
     box.append(segmented([
       ['ai', 'AI로 구조·관계선·표 만들기', ai ? '원문 문장은 그대로, 제목과 관계를 AI가 찾아요' : 'claude.ai에서 열면 쓸 수 있어요'],
       ['plain', '제목(#)대로 나누기', 'AI 없이, 마크다운 제목과 문단 그대로'],
-    ], mode, (v) => { if (v === 'ai' && !ai) { ui.toast('AI는 claude.ai에 게시된 페이지에서 동작해요.'); box.querySelector('[data-v="plain"]').click(); return; } mode = v; const b = actionBtn('go'); if (b) b.textContent = label(); }, '바꾸는 방법'));
+    ], mode, (v) => { if (v === 'ai' && !ai) { ui.toast('AI는 claude.ai의 Shellwork에서 동작해요.', 'AI 버전으로 옮기기', SW.transfer.moveDialog); box.querySelector('[data-v="plain"]').click(); return; } mode = v; const b = actionBtn('go'); if (b) b.textContent = label(); }, '바꾸는 방법'));
     if (!ai) box.querySelector('[data-v="ai"]').classList.add('off');
     ui.modal({
       title: '글을 셸 구조로 바꾸기', wide: true, node: box, area: text || '',
@@ -392,7 +402,7 @@
   main.writeDialog = () => {
     if (!aiReady()) {
       ui.modal({ title: 'AI로 글 쓰기', text: 'AI 글쓰기는 claude.ai에 게시된 페이지에서 내 Claude 계정으로 동작해요. 지금은 보드를 그대로 Word나 마크다운으로 저장할 수 있어요.',
-        actions: [{ label: '닫기', act: () => false }, { label: 'Word로 저장', cls: 'primary', act: () => { main.exportWord(); } }] });
+        actions: [{ label: '닫기', act: () => false }, { label: 'Word로 저장', act: () => { main.exportWord(); } }, { label: 'AI 버전으로 옮기기', cls: 'primary', act: () => { setTimeout(SW.transfer.moveDialog, 0); } }] });
       return;
     }
     let kind = 'report', text = '', ctl = null, timer = null;
@@ -432,19 +442,23 @@
   };
 
   /* ---------- PowerPoint ---------- */
-  function deckPreview(deck, box) {
+  function deckPreview(deck, box, theme) {
     box.textContent = '';
-    const grid = mk('ol', 'deck-grid');
+    const grid = mk('ol', 'deck-grid th-' + theme);
     deck.slides.forEach((d, i) => {
       const li = mk('li', 'slide-thumb t-' + (d.type || 'bullets'));
       const face = mk('div', 'slide-face');
-      if (d.type !== 'cover' && d.type !== 'closing' && d.type !== 'section') face.append(mk('i', 'slide-mark'));
+      if (d.tag) face.append(mk('span', 'slide-kicker', d.tag));
+      else if (d.type === 'cover') face.append(mk('i', 'slide-mark'));
       face.append(mk('strong', '', d.title || (d.type === 'closing' ? '감사합니다' : '')));
       if (d.type === 'image' && d.image && SW.images.url(d.image)) { const im = mk('img'); im.src = SW.images.url(d.image); im.alt = ''; face.append(im); }
       else if (d.type === 'table' && d.table) face.append(mk('span', 'slide-tag', '표 ' + (d.table.length - 1) + '행'));
+      else if (d.type === 'statement') face.append(mk('span', 'slide-big', d.text || ''));
+      else if (d.type === 'agenda') (d.items || []).slice(0, 5).forEach((t, k) => { const r = mk('span', 'slide-line num'); r.append(mk('b', '', String(k + 1).padStart(2, '0')), document.createTextNode(' ' + t)); face.append(r); });
+      else if (d.type === 'cards' && d.cards) { const row = mk('span', 'slide-cards'); d.cards.slice(0, 4).forEach((c) => row.append(mk('span', 'slide-card', c.title))); face.append(row); }
       else if (d.subtitle && (d.type === 'cover' || d.type === 'section' || d.type === 'closing')) face.append(mk('span', 'slide-sub', d.subtitle));
       else (d.bullets || []).slice(0, 4).forEach((b) => face.append(mk('span', 'slide-line', typeof b === 'string' ? b : b.text)));
-      const TYPE = { cover: '표지', section: '구분', bullets: '요점', table: '표', image: '그림', closing: '마무리' };
+      const TYPE = { cover: '표지', agenda: '목차', section: '구분', statement: '한 문장', cards: '카드', bullets: '요점', table: '표', image: '그림', closing: '마무리' };
       const foot = mk('div', 'slide-foot'); foot.append(mk('b', '', String(i + 1)), mk('span', '', TYPE[d.type] || '요점'));
       if (d.notes) foot.append(mk('span', 'slide-notes', '대본'));
       li.append(face, foot); grid.append(li);
@@ -454,22 +468,29 @@
   main.pptDialog = () => {
     const ai = aiReady();
     let mode = ai ? 'ai' : 'board', len = 'normal', deck = null, busy = false;
+    let theme = SW.ls.get('shellwork.pptTheme'); if (!SW.pptx.THEMES[theme]) theme = 'canvas';
     const box = mk('div', 'ppt-box');
     const opts = mk('div', 'ppt-opts');
+    const themeRow = segmented(Object.keys(SW.pptx.THEMES).map((k) => [k, SW.pptx.THEMES[k].label, { light: '흰 바탕, 깔끔하게', canvas: 'Shellwork처럼 회색 바탕에 흰 카드', dark: '어두운 발표장에 잘 보여요' }[k]]), theme, (v) => {
+      theme = v; SW.ls.set('shellwork.pptTheme', v);
+      const g = prev.querySelector('.deck-grid'); if (g) g.className = 'deck-grid th-' + v;
+    }, '디자인');
+    themeRow.classList.add('theme-row');
+    themeRow.querySelectorAll('.seg-btn').forEach((b) => { const sw = mk('i', 'theme-sw sw-' + b.dataset.v); b.prepend(sw); });
     const lenRow = segmented([['short', '짧게', '6~8장'], ['normal', '보통', '10~14장'], ['long', '길게', '15~20장']], len, (v) => { len = v; reset(); }, '분량');
     const req = mk('input', 'req'); req.type = 'text'; req.placeholder = '추가 요청 (선택) · 예: 5분 교내 발표, 심사위원 대상'; req.maxLength = 200;
     const modeRow = segmented([
       ['ai', 'AI가 슬라이드로 다듬기', ai ? '요점·표·그림 배치와 발표 대본까지' : 'claude.ai에서 열면 쓸 수 있어요'],
-      ['board', '보드 그대로', '셸 하나가 한 장, AI 없이 바로'],
+      ['board', '보드 그대로', '큰 셸이 한 장, 하위 셸은 카드로 · AI 없이 바로'],
     ], mode, (v) => {
-      if (v === 'ai' && !ai) { ui.toast('AI는 claude.ai에 게시된 페이지에서 동작해요.'); modeRow.querySelector('[data-v="board"]').click(); return; }
+      if (v === 'ai' && !ai) { ui.toast('AI는 claude.ai의 Shellwork에서 동작해요.', 'AI 버전으로 옮기기', SW.transfer.moveDialog); modeRow.querySelector('[data-v="board"]').click(); return; }
       mode = v; lenRow.hidden = req.hidden = mode !== 'ai'; reset();
     }, '만드는 방법');
     if (!ai) modeRow.querySelector('[data-v="ai"]').classList.add('off');
     lenRow.hidden = req.hidden = mode !== 'ai';
     const prev = mk('div', 'deck-preview');
     prev.append(mk('p', 'write-empty', '"만들기"를 누르면 슬라이드 구성을 먼저 보여 드려요. 마음에 들면 파일로 저장하세요.'));
-    opts.append(modeRow, lenRow, req); box.append(opts, prev);
+    opts.append(modeRow, lenRow, req, themeRow); box.append(opts, prev);
     function reset() { deck = null; const g = actionBtn('go'), a = actionBtn('again'); if (g) g.textContent = '만들기'; if (a) a.hidden = true; }
     async function make(b) {
       busy = true; b.disabled = true; b.textContent = mode === 'ai' ? '구성하는 중…' : '만드는 중…';
@@ -477,7 +498,7 @@
       try {
         await SW.images.load().catch(() => {});
         deck = mode === 'ai' ? await SW.ai.deck(len, req.value.trim()) : SW.pptx.fromBoard();
-        if (deck) { deckPreview(deck, prev); b.textContent = 'PPT 파일 저장'; const a = actionBtn('again'); if (a) a.hidden = false; }
+        if (deck) { deckPreview(deck, prev, theme); b.textContent = 'PPT 파일 저장'; const a = actionBtn('again'); if (a) a.hidden = false; }
       } catch (e) { ui.toast(SW.ai.errText(e)); reset(); prev.textContent = ''; }
       finally { busy = false; b.disabled = false; }
     }
@@ -490,7 +511,7 @@
           if (busy) return true;
           if (!deck) { await make(b); return true; }
           busy = true; b.disabled = true; b.textContent = '파일 만드는 중…';
-          try { await saveFile(fileBase() + '.pptx', await SW.pptx.build(deck)); }
+          try { await saveFile(fileBase() + '.pptx', await SW.pptx.build(deck, theme)); }
           catch (e) { ui.toast(e && e.message === 'lib' ? 'PPT 도구를 불러오지 못했어요. 인터넷 연결을 확인해 주세요.' : 'PPT 파일을 만들지 못했어요.'); }
           finally { busy = false; b.disabled = false; b.textContent = 'PPT 파일 저장'; }
           return true;
@@ -589,6 +610,7 @@
     $('#exportBtn').onclick = exportMenu;
     $('#pasteBtn').onclick = () => main.importDialog();
     $('#imageBtn').onclick = imageMenu;
+    $('#moveToAi').onclick = SW.transfer.moveDialog;
     $('#imageInput').addEventListener('change', (e) => { const f = [...e.target.files]; e.target.value = ''; if (f.length) SW.images.insertFiles(f, null, imageParent); imageParent = null; });
     $('#addShellBtn').onclick = () => { main.setView('canvas'); C.addRoot(); };
     $('#addTextBtn').onclick = () => { main.setView('canvas'); C.addText(); };

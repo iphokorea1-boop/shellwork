@@ -66,18 +66,27 @@
     ? P().db.collection('shared/' + board.id + '/images')
     : P().db.doc('data/users/' + P().uid + '/' + board.id).collection('images'));
 
-  async function write(id, url) {
+  async function writeTo(board, id, url) {
     const mode = P().mode;
-    if (mode === 'cloud') await col(S.board).doc(id).set({ url, createdAt: Date.now() });
+    if (mode === 'cloud') await col(board).doc(id).set({ url, createdAt: Date.now() });
     else if (mode === 'local') await idbDo('readwrite', (st) => st.put(url, id));
-    Im.here.add(id);
   }
-  async function read(id) {
+  async function readFrom(board, id) {
     const mode = P().mode;
-    if (mode === 'cloud') { const d = await col(S.board).doc(id).get(); return d.exists ? d.data().url : null; }
+    if (mode === 'cloud') { const d = await col(board).doc(id).get(); return d.exists ? d.data().url : null; }
     if (mode === 'local') return (await idbDo('readonly', (st) => st.get(id))) || null;
     return null;
   }
+  async function write(id, url) { await writeTo(S.board, id, url); Im.here.add(id); }
+  const read = (id) => readFrom(S.board, id);
+  /* another board's pictures (board files), and storing pictures for a board that is not open */
+  Im.urlFor = async (board, id) => {
+    if (Im.cache.has(id)) return Im.cache.get(id);
+    const url = await readFrom(board, id).catch(() => null);
+    if (url) Im.cache.set(id, url);
+    return url || '';
+  };
+  Im.storeFor = (board, id, url) => { Im.cache.set(id, url); return writeTo(board, id, url); };
 
   /* add a picture file: shrink, store, and return the fields for a picture node */
   Im.add = async (file) => {

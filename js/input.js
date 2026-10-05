@@ -397,9 +397,11 @@
         e.preventDefault(); const t = shellUnder(e); unmark();
         SW.images.insertFiles(photos, C.toWorld(e.clientX, e.clientY), t ? t.dataset.id : null); return;
       }
+      const boardFile = files.find((f) => SW.transfer.isBoardFile(f));
+      if (boardFile) { e.preventDefault(); unmark(); SW.transfer.importFile(boardFile); return; }
       const doc = files.find((f) => SW.main.isTextFile(f));
       if (doc) { e.preventDefault(); unmark(); SW.main.importFile(doc); return; }
-      if (files.length) { e.preventDefault(); unmark(); SW.ui.toast('사진, .md, .txt 파일을 넣을 수 있어요'); return; }
+      if (files.length) { e.preventDefault(); unmark(); SW.ui.toast('사진, .md, .txt, 보드 파일(.shellwork.json)을 넣을 수 있어요'); return; }
       const raw = e.dataTransfer.getData(MIME); if (!raw) return;
       e.preventDefault(); unmark();
       let trees; try { trees = JSON.parse(raw); } catch (err) { return; }

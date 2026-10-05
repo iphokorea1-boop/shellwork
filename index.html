@@ -124,6 +124,7 @@
         <input id="photoInput" type="file" accept="image/*" multiple hidden>
         <input id="imageInput" type="file" accept="image/*" multiple hidden>
         <input id="docInput" type="file" accept=".md,.markdown,.txt,text/plain,text/markdown" hidden>
+        <input id="boardInput" type="file" accept=".json,.shellwork,application/json" hidden>
         <span class="dock-sep"></span>
         <button id="organizeBtn" class="dock-btn ai" data-tip="흩어진 조각을 AI가 묶어 줘요"><svg><use href="#i-spark"/></svg><span class="label">AI 구조화</span></button>
         <span class="dock-sep"></span>
@@ -178,7 +179,7 @@
         <h2>AI 도우미</h2>
         <button id="aiClose" class="icon-btn" data-tip="닫기" aria-label="닫기"><svg><use href="#i-close"/></svg></button>
       </div>
-      <p id="aiOff" class="ai-off" hidden>AI 기능은 claude.ai에 게시된 페이지에서 내 Claude 계정으로 동작해요. 이 화면에서는 캔버스와 문서 편집만 쓸 수 있어요. <a href="https://claude.ai/artifact/8iQWLuStXZsvzAGe8mooXV" target="_blank" rel="noopener">AI가 되는 버전 열기</a></p>
+      <p id="aiOff" class="ai-off" hidden>AI 기능은 claude.ai에 게시된 페이지에서 내 Claude 계정으로 동작해요. 이 화면에서는 캔버스와 문서 편집만 쓸 수 있어요. <button type="button" id="moveToAi" class="link-btn">이 보드를 AI 버전으로 옮기기</button></p>
       <div class="ai-quick">
         <button class="chip" data-board-action="organize">흩어진 셸 구조화</button>
         <button class="chip" data-board-action="fill">빈 본문 채우기</button>
@@ -257,5 +258,6 @@
 <script src="js/history.js" charset="utf-8"></script>
 <script src="js/docx.js" charset="utf-8"></script>
 <script src="js/pptx.js" charset="utf-8"></script>
+<script src="js/transfer.js" charset="utf-8"></script>
 <script src="js/keys.js" charset="utf-8"></script>
 <script src="js/main.js" charset="utf-8"></script>

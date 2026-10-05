@@ -181,6 +181,10 @@
     { id: 'newMid', g: G.board, label: '새 보드: R&E 중간 보고', run: () => SW.main.newBoard('mid') },
     { id: 'newFinal', g: G.board, label: '새 보드: R&E 최종 보고서', run: () => SW.main.newBoard('final') },
     { id: 'history', g: G.board, label: '버전 기록', keys: 'Shift+H', run: () => SW.history.open() },
+    { id: 'fileOut', g: G.board, label: '이 보드를 파일로 내보내기 (.shellwork.json)', run: () => SW.transfer.exportBoard() },
+    { id: 'fileOutAll', g: G.board, label: '모든 보드를 파일로 내보내기 (백업)', run: () => SW.transfer.exportAll() },
+    { id: 'fileIn', g: G.board, label: '보드 파일 가져오기', run: () => SW.transfer.pickFile() },
+    { id: 'move', g: G.board, label: window.claude ? '이 보드를 웹사이트로 옮기기' : '이 보드를 AI 버전으로 옮기기', run: () => SW.transfer.moveDialog() },
     { id: 'newTalk', g: G.board, label: '새 보드: 연구 발표 템플릿', run: () => SW.main.newBoard('talk') },
     { id: 'boards', g: G.board, label: '보드 목록 열기', run: () => { SW.main.setSidebar(true); $('#boardBtn').click(); } },
 

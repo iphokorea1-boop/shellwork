@@ -540,6 +540,48 @@
   .modal-card input.req { border-radius: 13px; }
 }
 
+/* slide previews follow the chosen theme */
+.slide-kicker { font-size: 6.5px; font-weight: 700; color: #2D6BF6; letter-spacing: .02em; }
+.slide-big { margin-top: auto; margin-bottom: auto; padding-left: 6px; border-left: 2px solid #2D6BF6; font-size: 10px; font-weight: 700; line-height: 1.35; }
+.slide-line.num b { color: #2D6BF6; margin-right: 2px; }
+.slide-line.num::before { content: none; }
+.slide-cards { display: flex; gap: 4px; margin-top: 6px; }
+.slide-card { flex: 1; min-width: 0; height: 30px; padding: 4px 5px; border-radius: 4px; background: #F4F4F6; box-shadow: inset 0 0 0 .5px #E4E4E9; font-size: 7.5px; font-weight: 700; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.deck-grid.th-canvas .slide-face { background: #F2F2F0; }
+.deck-grid.th-canvas .slide-card { background: #fff; box-shadow: inset 0 0 0 .5px #E1E1DD; }
+.deck-grid.th-canvas .t-section .slide-face { background: #E9E9E6; }
+.deck-grid.th-dark .slide-face { background: #141416; color: #F5F5F7; box-shadow: 0 0 0 1px #2F2F35; }
+.deck-grid.th-dark .slide-line, .deck-grid.th-dark .slide-sub { color: #B9B9C1; }
+.deck-grid.th-dark .slide-card { background: #1F1F23; box-shadow: inset 0 0 0 .5px #2F2F35; }
+.deck-grid.th-dark .slide-tag { background: #2A2A31; color: #B9B9C1; }
+.deck-grid.th-dark .t-section .slide-face { background: #1B1B1F; }
+.deck-grid.th-dark .slide-kicker, .deck-grid.th-dark .slide-line.num b { color: #6E9BFF; }
+.deck-grid.th-dark .slide-big, .deck-grid.th-dark .slide-mark { border-color: #6E9BFF; }
+.theme-row .seg-btn { display: grid; grid-template-columns: auto 1fr; column-gap: 10px; align-items: center; }
+.theme-row .seg-btn .seg-sub { grid-column: 2; }
+.theme-sw { grid-row: span 2; width: 34px; height: 22px; border-radius: 5px; box-shadow: inset 0 0 0 1px var(--rule-2); position: relative; overflow: hidden; }
+.theme-sw::after { content: ""; position: absolute; left: 6px; right: 6px; top: 8px; height: 8px; border-radius: 2px; }
+.sw-light { background: #fff; } .sw-light::after { background: #F4F4F6; box-shadow: inset 0 0 0 .5px #D9D9DE; }
+.sw-canvas { background: #F2F2F0; } .sw-canvas::after { background: #fff; box-shadow: inset 0 0 0 .5px #D8D8D3; }
+.sw-dark { background: #141416; } .sw-dark::after { background: #2A2A31; }
+
+/* moving a board between the website and the AI page */
+.link-btn { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; }
+.link-btn:hover { text-decoration: underline; }
+.move-steps { margin: 0; padding: 0; list-style: none; counter-reset: step; display: flex; flex-direction: column; gap: 10px; }
+.move-steps li {
+  counter-increment: step; position: relative; display: grid; grid-template-columns: 1fr auto; column-gap: 12px; align-items: center;
+  padding: 12px 14px 12px 50px; border-radius: 12px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--rule);
+}
+.move-steps li::before {
+  content: counter(step); position: absolute; left: 14px; top: 50%; width: 24px; height: 24px; margin-top: -12px; border-radius: 50%;
+  display: grid; place-items: center; background: var(--ink); color: var(--on-ink); font-size: 12px; font-weight: 700;
+}
+.move-steps strong { grid-column: 1; font-size: 13.5px; color: var(--ink); }
+.move-steps span { grid-column: 1; font-size: 12.5px; color: var(--ink-2); line-height: 1.5; }
+.move-steps .btn { grid-column: 2; grid-row: 1 / span 2; text-decoration: none; color: var(--ink); }
+@supports (corner-shape: squircle) { .move-steps li { corner-shape: squircle; border-radius: 16px; } }
+
 /* ---------- Apple-style continuous corners ----------
  * Where the browser draws squircles (corner-shape), corners blend into the edges like Apple's.
  * A squircle reads tighter than a circular arc of the same radius, so radii grow to keep the visual size. */
