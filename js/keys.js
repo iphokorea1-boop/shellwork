@@ -61,14 +61,15 @@
     const out = [];
     const walk = (id, d) => {
       const s = S.get(id);
-      if (S.isText(s)) { if (s.body.trim()) out.push(s.body.trim(), ''); }
+      if (S.isImage(s)) out.push('*[그림] ' + (s.body.trim() || '설명 없음') + '*', '');
+      else if (S.isText(s)) { if (s.body.trim()) out.push(s.body.trim(), ''); }
       else { out.push('#'.repeat(Math.min(6, d + 1)) + ' ' + (s.title.trim() || '(제목 없음)'), ''); if (s.body.trim()) out.push(s.body.trim(), ''); }
       s.children.forEach((c) => walk(c, S.isText(s) ? d : d + 1));
     };
     ids.forEach((id) => walk(id, 1));
     return out.join('\n').trim();
   }
-  const snap = (id) => { const s = S.get(id); return { kind: s.kind, title: s.title, body: s.body, color: s.color, w: s.w, ai: s.ai, collapsed: s.collapsed, x: s.x, y: s.y, root: !s.parent, children: s.children.map(snap) }; };
+  const snap = (id) => { const s = S.get(id); return { kind: s.kind, title: s.title, body: s.body, color: s.color, w: s.w, ai: s.ai, collapsed: s.collapsed, img: s.img, ratio: s.ratio, x: s.x, y: s.y, root: !s.parent, children: s.children.map(snap) }; };
   function copy(cut) {
     const ids = top(sel()); if (!ids.length) return;
     const md = mdOf(ids);
@@ -85,12 +86,15 @@
     S.checkpoint();
     const add = (t, parent, pos) => {
       const f = { body: t.body || '', ai: !!t.ai, collapsed: !!t.collapsed, w: t.w, x: pos ? pos.x : 0, y: pos ? pos.y : 0 };
-      if (t.kind === 'text') f.kind = 'text'; else f.title = t.title || '';
+      if (t.kind === 'text') f.kind = 'text';
+      else if (t.kind === 'image') { f.kind = 'image'; f.img = t.img; f.ratio = t.ratio; }
+      else f.title = t.title || '';
       if (t.color) f.color = t.color;
       const s = S.add(f, parent); t.children.forEach((ch) => add(ch, s.id)); return s;
     };
     const ctr = C.center(), off = 32 * c.times;
     const made = c.trees.map((t, i) => add(t, null, t.root ? { x: t.x + off, y: t.y + off } : { x: Math.round(ctr.x - 160 + i * 24), y: Math.round(ctr.y - 60 + i * 24) }));
+    SW.images.adopt(S.imageIds(made.map((m) => m.id))); // pictures copied from another board come along
     S.changed(); C.selectMany(made.map((m) => m.id));
     SW.ui.toast(made.length + '개를 붙여 넣었어요', '되돌리기', S.undo);
     return true;
@@ -122,10 +126,13 @@
   K.commands = [
     { id: 'shell', g: G.make, label: '새 셸', keys: 'S', when: onCanvas, run: () => C.addRoot() },
     { id: 'text', g: G.make, label: '새 글', keys: 'T', when: onCanvas, run: () => C.addText() },
-    { id: 'pasteDlg', g: G.make, label: '글 붙여 넣어 조각으로 펼치기', run: () => $('#pasteBtn').click() },
-    { id: 'photo', g: G.make, label: '사진을 셸로 정리', run: () => $('#photoBtn').click() },
+    { id: 'pasteDlg', g: G.make, label: '글·md 파일을 셸 구조로 바꾸기 (관계선·표)', run: () => SW.main.importDialog() },
+    { id: 'image', g: G.make, label: '사진 넣기', keys: 'Shift+I', when: onCanvas, run: () => SW.main.pickImages() },
+    { id: 'photo', g: G.make, label: '사진을 AI로 읽어 셸로 정리', run: () => SW.main.pickPhotoForAI() },
+    { id: 'table', g: G.make, label: '표 넣기', when: () => onCanvas() && one() && !S.isImage(one()), run: () => C.insertTable(one().id) },
 
     { id: 'edit', g: G.edit, label: '고른 것 편집', keys: 'Enter', when: () => onCanvas() && one(), run: () => C.focusShell(one().id) },
+    { id: 'arrowName', g: G.edit, label: '고른 화살표에 관계 이름 붙이기', keys: 'Enter', when: () => onCanvas() && C.selArrow, run: () => C.editArrowLabel(C.selArrow) },
     { id: 'copy', g: G.edit, label: '복사', keys: 'Mod+C', when: () => onCanvas() && sel().length, run: () => copy(false) },
     { id: 'cut', g: G.edit, label: '잘라내기', keys: 'Mod+X', when: () => onCanvas() && sel().length, run: () => copy(true) },
     { id: 'pasteKey', g: G.edit, label: '붙여넣기', keys: 'Mod+V', display: true },
@@ -162,8 +169,11 @@
     { id: 'fill', g: G.ai, label: 'AI: 빈 본문 채우기', run: () => SW.ai.fill() },
     { id: 'critique', g: G.ai, label: 'AI: 논리 빈틈 찾기', run: () => { $('#aiPanel').hidden = false; SW.ai.critique(); } },
     { id: 'present', g: G.ai, label: '발표 시작', keys: 'P', when: () => SW.store.count() > 0, run: () => SW.present.start() },
+    { id: 'write', g: G.ai, label: 'AI로 글 쓰기 (보고서·설명글·요약)', run: () => SW.main.writeDialog() },
+    { id: 'ppt', g: G.ai, label: 'PPT(.pptx) 만들기', run: () => SW.main.pptDialog() },
     { id: 'word', g: G.ai, label: 'Word(.docx)로 내보내기', run: () => SW.main.exportWord() },
-    { id: 'export', g: G.ai, label: '마크다운으로 내보내기', keys: 'Mod+Shift+E', typing: true, run: () => { blurTyping(); $('#exportBtn').click(); } },
+    { id: 'md', g: G.ai, label: '마크다운으로 보기·복사', run: () => SW.main.exportMd() },
+    { id: 'export', g: G.ai, label: '내보내기 메뉴', keys: 'Mod+Shift+E', typing: true, run: () => { blurTyping(); $('#exportBtn').click(); } },
 
     { id: 'newBlank', g: G.board, label: '새 보드: 빈 보드', run: () => SW.main.newBoard() },
     { id: 'newRne', g: G.board, label: '새 보드: R&E 탐구 템플릿', run: () => SW.main.newBoard('rne') },
@@ -214,7 +224,7 @@
     if (typing() || !onCanvas() || !$('#modal').hidden || K.paletteOpen) return;
     const cd = e.clipboardData || window.clipboardData; if (!cd) return;
     const pics = [...(cd.files || [])].filter((f) => f.type.indexOf('image/') === 0);
-    if (pics.length) { e.preventDefault(); SW.ai.photo(pics); return; }
+    if (pics.length) { e.preventDefault(); const s = one(); SW.images.insertFiles(pics, null, s && !S.isText(s) ? s.id : null); return; }
     const text = cd.getData('text/plain');
     if (K.pasteClip(text)) { e.preventDefault(); return; }
     if (text && text.trim()) { e.preventDefault(); C.insertText(text); }
@@ -232,7 +242,7 @@
     const push = (g, item) => { if (!groups.has(g)) groups.set(g, []); groups.get(g).push(item); };
     if (q) {
       Object.values(S.board.shells).filter((s) => matches(S.label(s) + ' ' + s.body, q)).slice(0, 6)
-        .forEach((s) => push('셸로 이동', { label: S.label(s), sub: S.isText(s) ? '글' : '셸', run: () => { SW.main.setView('canvas'); C.reveal(s.id); } }));
+        .forEach((s) => push('셸로 이동', { label: S.label(s), sub: S.isImage(s) ? '그림' : S.isText(s) ? '글' : '셸', run: () => { SW.main.setView('canvas'); C.reveal(s.id); } }));
     }
     K.commands.filter((c) => c.run && !c.display && !c.hidden && (!c.when || c.when()) && (!q || matches(c.label + ' ' + c.g, q)))
       .forEach((c) => push(c.g, { label: c.label, keys: c.keys, run: c.run }));
@@ -288,7 +298,8 @@
       '셸은 문서의 제목, 글 조각은 문단이 돼요',
       '셸 안에 셸을 넣으면 제목 단계가 내려가요 (H1~H6, 6단계까지)',
       '캔버스 위 순서는 위에서 아래, 같은 줄은 왼쪽부터예요 (O로 번호 보기)',
-      '섹션과 화살표는 보기 위한 것이라 목차를 바꾸지 않아요',
+      '섹션과 화살표는 보기 위한 것이라 목차를 바꾸지 않아요. 화살표를 누르면 관계 이름(원인, 근거…)을 붙일 수 있어요',
+      '사진과 표는 문서, Word, PowerPoint에도 그대로 들어가요',
     ].forEach((txt) => { const r = document.createElement('div'); r.className = 'sheet-row'; r.textContent = txt; rules.append(r); });
     body.prepend(rules);
     document.querySelectorAll('[data-motion-pick]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.motionPick === SW.motion.style)));

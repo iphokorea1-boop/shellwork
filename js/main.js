@@ -70,8 +70,10 @@
     t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, actionLabel ? 7000 : 4500);
   };
 
-  ui.modal = ({ title, text, area, readonly, input, actions, node, image, onClose }) => {
+  ui.modal = ({ title, text, area, readonly, input, actions, node, image, onClose, wide, placeholder }) => {
     const m = $('#modal'); $('#modalTitle').textContent = title; $('#modalText').textContent = text || ''; $('#modalText').hidden = !text;
+    m.querySelector('.modal-card').classList.toggle('wide', !!wide);
+    $('#modalArea').placeholder = placeholder || '';
     const slot = $('#modalNode'); slot.textContent = ''; slot.hidden = !node; if (node) slot.append(node);
     const im = $('#modalImg'); im.hidden = !image; if (image) im.src = image; else im.removeAttribute('src');
     ui._onClose = onClose || null;
@@ -81,6 +83,8 @@
     const box = $('#modalActions'); box.textContent = '';
     actions.forEach((a) => {
       const b = document.createElement('button'); b.className = 'btn ' + (a.cls || ''); b.textContent = a.label;
+      if (a.id) b.dataset.act = a.id;
+      if (a.hidden) b.hidden = true;
       b.onclick = async () => { const keep = await a.act(ta.value, b); if (!keep) ui.closeModal(); };
       box.append(b);
     });
@@ -170,6 +174,7 @@
     S.board = b; S.undoStack = []; S.redoStack = []; C.selected.clear(); C.selArrow = null; C.selSection = null;
     if (!S.board.sections) S.board.sections = [];
     SW.history.reset();
+    SW.images.load().then(() => { if (S.board === b && main.view === 'doc') D.render(); }, () => {});
     main.showBoardName(); if (!b.example) P.rememberLast(b.id);
     main.setView(main.view); main.renderOutline();
     if (!C.loadView()) requestAnimationFrame(() => { C.render({ instant: true }); C.fit(true); });
@@ -269,7 +274,7 @@
       try { await downloads.save({ filename: fname, data: md }); ui.toast('파일을 저장했어요'); }
       catch (e) { if (e && e.code !== 'declined') ui.toast('파일로 저장하지 못했어요. 복사 버튼을 써 주세요.'); return true; }
     } });
-    ui.modal({ title: '내보내기', text: '셸의 계층이 제목 단계가 돼요. 마크다운은 Notion·블로그에, Word 파일은 학교 제출이나 한글(HWP)에서 열 때 써요.', area: md, readonly: true, actions });
+    ui.modal({ title: '마크다운으로 내보내기', text: '셸의 계층이 제목 단계가 돼요. 마크다운은 Notion·블로그에, Word 파일은 학교 제출이나 한글(HWP)에서 열 때 써요.', area: md, readonly: true, actions });
   }
   main.exportWord = () => saveFile((S.board.name.trim().slice(0, 60) || 'shellwork') + '.docx', SW.docx.build());
   /* hand a generated file to the viewer: the claude.ai save dialog when published, a plain download link elsewhere */
@@ -283,16 +288,216 @@
     const a = document.createElement('a'); a.href = URL.createObjectURL(data instanceof Blob ? data : new Blob([data])); a.download = name;
     document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
   }
-  function pasteDialog() {
+  main.exportMd = exportMd;
+  main.saveFile = saveFile;
+  const fileBase = () => S.board.name.replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 60) || 'shellwork';
+  const aiReady = () => !!(SW.ai.sample && !SW.ai.disabled);
+  const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  /* a row of choices that behaves like radio buttons */
+  function segmented(options, value, onPick, label) {
+    const row = mk('div', 'seg'); row.setAttribute('role', 'radiogroup'); if (label) row.setAttribute('aria-label', label);
+    options.forEach(([v, text, sub]) => {
+      const b = mk('button', 'seg-btn'); b.type = 'button'; b.setAttribute('role', 'radio'); b.dataset.v = v;
+      b.append(mk('span', 'seg-label', text)); if (sub) b.append(mk('span', 'seg-sub', sub));
+      b.setAttribute('aria-checked', String(v === value));
+      b.onclick = () => { row.querySelectorAll('.seg-btn').forEach((x) => x.setAttribute('aria-checked', String(x === b))); onPick(v); };
+      row.append(b);
+    });
+    return row;
+  }
+  const actionBtn = (id) => document.querySelector('#modalActions [data-act="' + id + '"]');
+
+  /* ---------- export menu ---------- */
+  function exportMenu() {
+    ui.openMenu($('#exportBtn'), [
+      { heading: '보드를 결과물로' },
+      { label: 'PowerPoint 만들기 (.pptx)', meta: '발표 자료', act: main.pptDialog },
+      { label: 'AI로 글 쓰기', meta: '보고서·설명글·요약', act: main.writeDialog },
+      { label: 'Word로 저장 (.docx)', meta: '보드 그대로', act: main.exportWord },
+      { label: '마크다운 보기·복사', act: exportMd },
+      '-', { heading: '가져오기' },
+      { label: '글·md 파일을 셸 구조로', meta: '관계선·표', act: () => main.importDialog() },
+    ]);
+  }
+
+  /* ---------- text and Markdown files → shells ---------- */
+  main.isTextFile = (f) => /\.(md|markdown|txt|text)$/i.test(f.name || '') || /^text\/(plain|markdown|x-markdown)/.test(f.type || '');
+  async function readTextFile(f) {
+    const buf = await f.arrayBuffer();
+    try { return new TextDecoder('utf-8', { fatal: true }).decode(buf); } catch (e) { /* Korean Windows files are often EUC-KR */ }
+    try { return new TextDecoder('euc-kr').decode(buf); } catch (e) { return new TextDecoder('utf-8').decode(buf); }
+  }
+  main.importFile = async (f) => {
+    if (f.size > 3 * 1024 * 1024) { ui.toast('파일이 너무 커요 (3MB까지).'); return; }
+    try { main.importDialog(await readTextFile(f), f.name); } catch (e) { ui.toast('파일을 읽지 못했어요.'); }
+  };
+  main.importDialog = (text, name) => {
+    const ai = aiReady(); let mode = ai ? 'ai' : 'plain', fname = name || '';
+    const box = mk('div', 'import-head');
+    const open = mk('button', 'btn', '파일 열기 (.md, .txt)'); open.type = 'button';
+    const chip = mk('span', 'file-chip', fname); chip.hidden = !fname;
+    open.onclick = () => {
+      const inp = $('#docInput'); inp.value = '';
+      inp.onchange = async () => { const f = inp.files[0]; if (!f) return; $('#modalArea').value = await readTextFile(f); fname = f.name; chip.textContent = f.name; chip.hidden = false; };
+      inp.click();
+    };
+    const top = mk('div', 'import-row'); top.append(open, chip); box.append(top);
+    const label = () => (mode === 'ai' ? 'AI로 구조 만들기' : '셸로 나누기');
+    box.append(segmented([
+      ['ai', 'AI로 구조·관계선·표 만들기', ai ? '원문 문장은 그대로, 제목과 관계를 AI가 찾아요' : 'claude.ai에서 열면 쓸 수 있어요'],
+      ['plain', '제목(#)대로 나누기', 'AI 없이, 마크다운 제목과 문단 그대로'],
+    ], mode, (v) => { if (v === 'ai' && !ai) { ui.toast('AI는 claude.ai에 게시된 페이지에서 동작해요.'); box.querySelector('[data-v="plain"]').click(); return; } mode = v; const b = actionBtn('go'); if (b) b.textContent = label(); }, '바꾸는 방법'));
+    if (!ai) box.querySelector('[data-v="ai"]').classList.add('off');
     ui.modal({
-      title: '글을 붙여 넣어 셸로 나누기',
-      text: '메모, 회의록, 마크다운 무엇이든 괜찮아요. 제목(#)·목록(-)이 있으면 그 계층대로, 없으면 문단마다 셸 하나로 나눕니다.',
-      area: '', actions: [
+      title: '글을 셸 구조로 바꾸기', wide: true, node: box, area: text || '',
+      placeholder: '보고서 초안, 회의록, 수업 필기, 마크다운 문서를 붙여 넣거나 파일을 여세요.',
+      actions: [
         { label: '취소', act: () => false },
-        { label: '셸로 나누기', cls: 'primary', act: (v) => { if (!v.trim()) return true; main.setView('canvas'); C.insertText(v); } },
+        { id: 'go', label: label(), cls: 'primary', act: (v) => {
+          if (!v.trim()) { ui.toast('먼저 글을 넣어 주세요'); return true; }
+          main.setView('canvas');
+          if (mode === 'ai') setTimeout(() => SW.ai.importText(v, fname), 0); else C.insertText(v);
+        } },
       ],
     });
+    const card = $('#modal .modal-card');
+    card.ondragover = (e) => { if ([...e.dataTransfer.types].includes('Files')) { e.preventDefault(); card.classList.add('drop-file'); } };
+    card.ondragleave = () => card.classList.remove('drop-file');
+    card.ondrop = async (e) => {
+      card.classList.remove('drop-file');
+      const f = [...(e.dataTransfer.files || [])].find(main.isTextFile); if (!f) return;
+      e.preventDefault(); $('#modalArea').value = await readTextFile(f); fname = f.name; chip.textContent = f.name; chip.hidden = false;
+    };
+  };
+
+  /* ---------- pictures ---------- */
+  let imageParent = null;
+  main.pickImages = (parentId) => { imageParent = parentId || null; const inp = $('#imageInput'); inp.value = ''; inp.click(); };
+  main.pickPhotoForAI = () => { if (!aiReady()) { ui.toast('AI는 claude.ai에 게시된 페이지에서 동작해요. 사진 넣기는 지금도 돼요.'); return; } $('#photoInput').click(); };
+  function imageMenu() {
+    ui.openMenu($('#imageBtn'), [
+      { label: '사진 넣기', meta: SW.keys.fmt('Shift+I'), act: () => main.pickImages() },
+      { label: '사진을 AI로 읽어 셸로 정리', meta: '필기·칠판·도표', act: main.pickPhotoForAI },
+      { note: '사진을 캔버스나 셸 위로 끌어 놓아도 돼요' },
+    ]);
   }
+
+  /* ---------- AI writing: the board → a report, an essay, a summary or a script ---------- */
+  const escHtml = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const figure = (id) => {
+    const url = SW.images.url(id); const node = Object.values(S.board.shells).find((s) => s.img === id);
+    if (!url) return '<p class="fig-missing">[그림을 찾지 못했어요]</p>';
+    return '<figure class="wfig"><img src="' + url + '" alt=""><figcaption>' + escHtml(node && node.body.trim() ? node.body.trim().split('\n')[0] : '') + '</figcaption></figure>';
+  };
+  main.writeDialog = () => {
+    if (!aiReady()) {
+      ui.modal({ title: 'AI로 글 쓰기', text: 'AI 글쓰기는 claude.ai에 게시된 페이지에서 내 Claude 계정으로 동작해요. 지금은 보드를 그대로 Word나 마크다운으로 저장할 수 있어요.',
+        actions: [{ label: '닫기', act: () => false }, { label: 'Word로 저장', cls: 'primary', act: () => { main.exportWord(); } }] });
+      return;
+    }
+    let kind = 'report', text = '', ctl = null, timer = null;
+    const box = mk('div', 'write-box');
+    box.append(segmented([['report', '연구 보고서'], ['essay', '설명하는 글'], ['summary', '한 쪽 요약'], ['script', '발표 대본']], kind, (v) => { kind = v; }, '글 종류'));
+    const req = mk('input', 'req'); req.type = 'text'; req.placeholder = '추가 요청 (선택) · 예: 3000자 안팎, 결론을 자세히, 존댓말 없이'; req.maxLength = 200;
+    const out = mk('div', 'write-out doc-like');
+    const empty = () => { out.innerHTML = ''; out.append(mk('p', 'write-empty', '종류를 고르고 "쓰기"를 누르면 보드 내용으로 글을 써요. 보드에 없는 내용은 지어내지 않고 "(보충 필요)"로 표시해요.')); };
+    empty(); box.append(req, out);
+    const paint = () => { timer = null; out.innerHTML = SW.md(text, { headings: true, figure }); out.scrollTop = out.scrollHeight; };
+    const titleOf = () => { const m = /^#\s+(.+)$/m.exec(text); return (m ? m[1] : S.board.name).replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 60) || fileBase(); };
+    const need = () => { if (!text.trim() || ctl) { ui.toast(ctl ? '다 쓸 때까지 기다려 주세요' : '먼저 "쓰기"를 눌러 주세요'); return false; } return true; };
+    ui.modal({
+      title: 'AI로 글 쓰기', wide: true, node: box,
+      onClose: () => { if (ctl) ctl.abort(); },
+      actions: [
+        { label: '닫기', act: () => false },
+        { id: 'copy', label: '복사', act: () => { if (need()) ui.copy(text); return true; } },
+        { id: 'md', label: '.md 저장', act: async () => { if (need()) await saveFile(titleOf() + '.md', text); return true; } },
+        { id: 'docx', label: 'Word로 저장', act: async () => { if (need()) await saveFile(titleOf() + '.docx', SW.docx.fromMarkdown(text)); return true; } },
+        { id: 'go', label: '쓰기', cls: 'primary', act: async (v, b) => {
+          if (ctl) { ctl.abort(); return true; }
+          ctl = new AbortController(); text = ''; out.innerHTML = ''; out.append(mk('p', 'write-empty thinking', '보드를 읽고 있어요…'));
+          b.textContent = '멈추기';
+          try {
+            const r = await SW.ai.write(kind, req.value.trim(), ({ text: t }) => { text = t; if (!timer) timer = setTimeout(paint, 120); }, ctl.signal);
+            if (r != null) { text = r; paint(); }
+          } catch (e) {
+            if (e && e.text) { text = e.text + '\n\n(중간에 멈췄어요)'; paint(); }
+            else if (e && e.code === 'cancelled') { if (text) paint(); else empty(); }
+            else { ui.toast(SW.ai.errText(e)); if (!text) empty(); }
+          } finally { ctl = null; clearTimeout(timer); timer = null; b.textContent = text ? '다시 쓰기' : '쓰기'; }
+          return true;
+        } },
+      ],
+    });
+  };
+
+  /* ---------- PowerPoint ---------- */
+  function deckPreview(deck, box) {
+    box.textContent = '';
+    const grid = mk('ol', 'deck-grid');
+    deck.slides.forEach((d, i) => {
+      const li = mk('li', 'slide-thumb t-' + (d.type || 'bullets'));
+      const face = mk('div', 'slide-face');
+      if (d.type !== 'cover' && d.type !== 'closing' && d.type !== 'section') face.append(mk('i', 'slide-mark'));
+      face.append(mk('strong', '', d.title || (d.type === 'closing' ? '감사합니다' : '')));
+      if (d.type === 'image' && d.image && SW.images.url(d.image)) { const im = mk('img'); im.src = SW.images.url(d.image); im.alt = ''; face.append(im); }
+      else if (d.type === 'table' && d.table) face.append(mk('span', 'slide-tag', '표 ' + (d.table.length - 1) + '행'));
+      else if (d.subtitle && (d.type === 'cover' || d.type === 'section' || d.type === 'closing')) face.append(mk('span', 'slide-sub', d.subtitle));
+      else (d.bullets || []).slice(0, 4).forEach((b) => face.append(mk('span', 'slide-line', typeof b === 'string' ? b : b.text)));
+      const TYPE = { cover: '표지', section: '구분', bullets: '요점', table: '표', image: '그림', closing: '마무리' };
+      const foot = mk('div', 'slide-foot'); foot.append(mk('b', '', String(i + 1)), mk('span', '', TYPE[d.type] || '요점'));
+      if (d.notes) foot.append(mk('span', 'slide-notes', '대본'));
+      li.append(face, foot); grid.append(li);
+    });
+    box.append(mk('p', 'deck-sum', deck.slides.length + '장 · 대본이 있는 장 ' + deck.slides.filter((d) => d.notes).length + '개. 저장한 파일은 PowerPoint, Keynote, 구글 슬라이드에서 열고 고칠 수 있어요.'), grid);
+  }
+  main.pptDialog = () => {
+    const ai = aiReady();
+    let mode = ai ? 'ai' : 'board', len = 'normal', deck = null, busy = false;
+    const box = mk('div', 'ppt-box');
+    const opts = mk('div', 'ppt-opts');
+    const lenRow = segmented([['short', '짧게', '6~8장'], ['normal', '보통', '10~14장'], ['long', '길게', '15~20장']], len, (v) => { len = v; reset(); }, '분량');
+    const req = mk('input', 'req'); req.type = 'text'; req.placeholder = '추가 요청 (선택) · 예: 5분 교내 발표, 심사위원 대상'; req.maxLength = 200;
+    const modeRow = segmented([
+      ['ai', 'AI가 슬라이드로 다듬기', ai ? '요점·표·그림 배치와 발표 대본까지' : 'claude.ai에서 열면 쓸 수 있어요'],
+      ['board', '보드 그대로', '셸 하나가 한 장, AI 없이 바로'],
+    ], mode, (v) => {
+      if (v === 'ai' && !ai) { ui.toast('AI는 claude.ai에 게시된 페이지에서 동작해요.'); modeRow.querySelector('[data-v="board"]').click(); return; }
+      mode = v; lenRow.hidden = req.hidden = mode !== 'ai'; reset();
+    }, '만드는 방법');
+    if (!ai) modeRow.querySelector('[data-v="ai"]').classList.add('off');
+    lenRow.hidden = req.hidden = mode !== 'ai';
+    const prev = mk('div', 'deck-preview');
+    prev.append(mk('p', 'write-empty', '"만들기"를 누르면 슬라이드 구성을 먼저 보여 드려요. 마음에 들면 파일로 저장하세요.'));
+    opts.append(modeRow, lenRow, req); box.append(opts, prev);
+    function reset() { deck = null; const g = actionBtn('go'), a = actionBtn('again'); if (g) g.textContent = '만들기'; if (a) a.hidden = true; }
+    async function make(b) {
+      busy = true; b.disabled = true; b.textContent = mode === 'ai' ? '구성하는 중…' : '만드는 중…';
+      prev.textContent = ''; prev.append(mk('p', 'write-empty thinking', mode === 'ai' ? 'AI가 보드를 읽고 슬라이드를 짜고 있어요…' : '보드를 슬라이드로 옮기는 중…'));
+      try {
+        await SW.images.load().catch(() => {});
+        deck = mode === 'ai' ? await SW.ai.deck(len, req.value.trim()) : SW.pptx.fromBoard();
+        if (deck) { deckPreview(deck, prev); b.textContent = 'PPT 파일 저장'; const a = actionBtn('again'); if (a) a.hidden = false; }
+      } catch (e) { ui.toast(SW.ai.errText(e)); reset(); prev.textContent = ''; }
+      finally { busy = false; b.disabled = false; }
+    }
+    ui.modal({
+      title: 'PowerPoint 만들기', wide: true, node: box,
+      actions: [
+        { label: '닫기', act: () => false },
+        { id: 'again', label: '다시 만들기', hidden: true, act: async () => { const g = actionBtn('go'); if (!busy && g) await make(g); return true; } },
+        { id: 'go', label: '만들기', cls: 'primary', act: async (v, b) => {
+          if (busy) return true;
+          if (!deck) { await make(b); return true; }
+          busy = true; b.disabled = true; b.textContent = '파일 만드는 중…';
+          try { await saveFile(fileBase() + '.pptx', await SW.pptx.build(deck)); }
+          catch (e) { ui.toast(e && e.message === 'lib' ? 'PPT 도구를 불러오지 못했어요. 인터넷 연결을 확인해 주세요.' : 'PPT 파일을 만들지 못했어요.'); }
+          finally { busy = false; b.disabled = false; b.textContent = 'PPT 파일 저장'; }
+          return true;
+        } },
+      ],
+    });
+  };
 
   /* shortcuts, the command palette and paste live in keys.js */
 
@@ -302,7 +507,8 @@
     [
       ['보드는 어디에 저장되나요?', 'claude.ai에서 열면 이 페이지의 저장소에 저장돼요. "내 보드"는 나만 볼 수 있고, "함께 쓰는 보드"는 이 페이지를 공유받은 사람이 함께 봐요. 내 컴퓨터에서 파일로 열면 지금 쓰는 브라우저에만 저장돼요.'],
       ['AI에게는 무엇이 보내지나요?', 'AI 기능을 쓸 때만 보드의 제목과 본문(그리고 고른 내용)이 내 Claude 계정을 통해 Claude에게 보내져요. 처음 쓸 때 허락을 묻고, 내 Claude 사용량이 쓰여요. 버튼을 누르지 않으면 아무것도 보내지 않아요.'],
-      ['사진은요?', '사진을 셸로 바꿀 때 사진이 Claude에게 보내져요. 보드에는 원본이 아니라 작은 미리보기 한 장만 출처로 남아요.'],
+      ['사진은요?', '보드에 넣은 사진은 한 장에 190KB 이하로 줄여서 보드와 함께 저장돼요(원본 파일은 저장하지 않아요). "AI로 읽기"를 누를 때만 그 사진이 Claude에게 보내져요.'],
+      ['글이나 파일을 구조로 바꿀 때는요?', 'AI로 구조를 만들 때는 넣은 글이 Claude에게 보내지고, 원문 문장은 고치지 않고 그대로 셸에 옮겨요. "제목(#)대로 나누기"는 AI 없이 이 화면 안에서만 처리해요.'],
       ['버전 기록은요?', '작업하는 동안 10분마다 자동으로 남고, 직접 이름을 붙여 남길 수도 있어요. 보드마다 최근 40개(브라우저 저장은 15개)까지 보관해요.'],
       ['학생이라면', '이름, 연락처, 학번 같은 개인정보는 보드에 적지 않는 게 안전해요. 함께 쓰는 보드는 초대한 사람만 들어오게 해 주세요.'],
     ].forEach(([q, a]) => { const h = document.createElement('h3'); h.textContent = q; const p = document.createElement('p'); p.textContent = a; box.append(h, p); });
@@ -380,8 +586,10 @@
     C.init(); D.init(); SW.present.init(); SW.collab.init(); SW.keys.init();
     document.querySelectorAll('.view-switch button').forEach((b) => { b.onclick = () => main.setView(b.dataset.view); });
     $('#boardBtn').onclick = boardMenu;
-    $('#exportBtn').onclick = exportMd;
-    $('#pasteBtn').onclick = pasteDialog;
+    $('#exportBtn').onclick = exportMenu;
+    $('#pasteBtn').onclick = () => main.importDialog();
+    $('#imageBtn').onclick = imageMenu;
+    $('#imageInput').addEventListener('change', (e) => { const f = [...e.target.files]; e.target.value = ''; if (f.length) SW.images.insertFiles(f, null, imageParent); imageParent = null; });
     $('#addShellBtn').onclick = () => { main.setView('canvas'); C.addRoot(); };
     $('#addTextBtn').onclick = () => { main.setView('canvas'); C.addText(); };
     document.querySelectorAll('[data-tool]').forEach((b) => { b.onclick = () => SW.input.setTool(b.dataset.tool); });

@@ -84,9 +84,11 @@
     if (P.mode === 'cloud') {
       const vs = await col().doc(id).collection('versions').get().catch(() => null);
       if (vs) await Promise.all(vs.docs.map((d) => col().doc(id).collection('versions').doc(d.id).delete().catch(() => {})));
+      await SW.images.removeBoard({ id, shared: false }).catch(() => {});
       await col().doc(id).delete(); return;
     }
     if (P.mode === 'local') {
+      try { await SW.images.removeBoard(JSON.parse(ls.get(LS_BOARD + id) || '{}')); } catch (e) { /* pictures are only clutter */ }
       ls.del(LS_BOARD + id); ls.del('shellwork.versions.' + id);
       try { ls.set(LS_INDEX, JSON.stringify(JSON.parse(ls.get(LS_INDEX) || '[]').filter((x) => x.id !== id))); } catch (e) { /* ignore */ }
     }

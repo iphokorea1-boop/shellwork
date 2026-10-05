@@ -14,12 +14,12 @@
   const db = () => SW.persist.db;
   const GREY = '#7A7F87';
 
-  const canon = (d) => JSON.stringify({
-    kind: d.kind === 'text' ? 'text' : '', title: d.title || '', body: d.body || '', notes: d.notes || '', parent: d.parent || null, order: d.order || 0,
+  const canon = (d) => JSON.stringify(Object.assign({
+    kind: d.kind === 'text' || d.kind === 'image' ? d.kind : '', title: d.title || '', body: d.body || '', notes: d.notes || '', parent: d.parent || null, order: d.order || 0,
     x: Math.round(d.x || 0), y: Math.round(d.y || 0), w: d.w || 300, color: d.color || '', collapsed: !!d.collapsed, ai: !!d.ai,
     src: d.src ? { kind: d.src.kind || 'photo', name: d.src.name || '', date: d.src.date || 0, page: d.src.page || '', thumb: d.src.thumb || '' } : null,
-  });
-  const arrowCanon = (a) => JSON.stringify({ from: a.from, to: a.to });
+  }, d.kind === 'image' ? { img: String(d.img || ''), ratio: +d.ratio || 0.75 } : {}));
+  const arrowCanon = (a) => JSON.stringify(Object.assign({ from: a.from, to: a.to }, a.label ? { label: String(a.label).slice(0, 30) } : {}));
   const secCanon = (s) => JSON.stringify({ x: Math.round(s.x || 0), y: Math.round(s.y || 0), w: Math.round(s.w || 0), h: Math.round(s.h || 0), title: s.title || '', color: s.color || '' });
 
   /* the local tree flattened: id → canonical JSON, with each shell's position among its siblings */
@@ -53,7 +53,7 @@
     const m = meta.data();
     const b = { id, name: m.name || '함께 쓰는 보드', shared: true, shells: {}, roots: [], arrows: [], createdAt: m.createdAt, updatedAt: m.updatedAt };
     shells.docs.forEach((d) => { const v = JSON.parse(canon(d.data())); if (!v.kind) delete v.kind; b.shells[d.id] = Object.assign({ id: d.id, children: [] }, v); });
-    arrows.docs.forEach((d) => { const a = d.data(); if (a.from && a.to) b.arrows.push({ id: d.id, from: a.from, to: a.to }); });
+    arrows.docs.forEach((d) => { const a = JSON.parse(arrowCanon(d.data())); if (a.from && a.to) b.arrows.push(Object.assign({ id: d.id }, a)); });
     b.sections = secs.docs.map((d) => Object.assign({ id: d.id }, JSON.parse(secCanon(d.data()))));
     rebuild(b);
     Co.synced = new Map(shells.docs.map((d) => [d.id, canon(d.data())]));
@@ -82,14 +82,15 @@
   /* move the open private board into the shared space */
   Co.share = async () => {
     const b = S.board;
+    await SW.images.load(); // pictures come along: read them from the private board first
     Co.synced = new Map(); Co.syncedArrows = new Map(); Co.syncedSecs = new Map(); Co.syncedName = null;
     b.shared = true;
-    try { await Co.flush(); } catch (e) { b.shared = false; throw e; }
+    try { await SW.images.copyHere(S.imageIds()); await Co.flush(); } catch (e) { b.shared = false; throw e; }
     try { await SW.persist.removePrivate(b.id); } catch (e) { /* the shared copy is what matters */ }
     Co.start(b);
   };
   Co.remove = async (id) => {
-    const kinds = ['shells', 'arrows', 'sections', 'versions'];
+    const kinds = ['shells', 'arrows', 'sections', 'versions', 'images'];
     const snaps = await Promise.all(kinds.map((k) => db().collection(base(id) + '/' + k).get().catch(() => ({ docs: [] }))));
     await runJobs(snaps.flatMap((sn, i) => sn.docs.map((d) => () => db().doc(base(id) + '/' + kinds[i] + '/' + d.id).delete())));
     await db().doc(base(id)).delete();
@@ -140,8 +141,9 @@
       const d = JSON.parse(j), s = B.shells[id]; if (!d.kind) delete d.kind;
       if (!s) { B.shells[id] = Object.assign({ id, children: [] }, d); structural = true; return; }
       const was = JSON.parse(mine || prev || '{}');
-      if (['kind', 'parent', 'order', 'x', 'y', 'w', 'collapsed', 'color', 'ai', 'src'].some((k) => JSON.stringify(was[k]) !== JSON.stringify(d[k]))) structural = true; else texts.push(id);
+      if (['kind', 'parent', 'order', 'x', 'y', 'w', 'collapsed', 'color', 'ai', 'src', 'img', 'ratio'].some((k) => JSON.stringify(was[k]) !== JSON.stringify(d[k]))) structural = true; else texts.push(id);
       Object.assign(s, d); if (!d.kind) delete s.kind;
+      if (d.kind !== 'image') { delete s.img; delete s.ratio; }
     });
     if (structural) { rebuild(B); Co.redraw(); } else texts.forEach(patchText);
   }
@@ -168,10 +170,13 @@
         if (Co.syncedArrows.delete(id)) { S.board.arrows = S.board.arrows.filter((a) => a.id !== id); changed = true; }
         return;
       }
-      const j = arrowCanon(ch.doc.data()); if (Co.syncedArrows.get(id) === j) return;
+      const j = arrowCanon(ch.doc.data()), prev = Co.syncedArrows.get(id); if (prev === j) return;
       Co.syncedArrows.set(id, j);
-      const d = JSON.parse(j);
-      if (!S.board.arrows.some((a) => a.id === id) && S.get(d.from) && S.get(d.to)) { S.board.arrows.push({ id, from: d.from, to: d.to }); changed = true; }
+      const d = JSON.parse(j), mine = S.board.arrows.find((a) => a.id === id);
+      if (!mine) { if (S.get(d.from) && S.get(d.to)) { S.board.arrows.push(Object.assign({ id }, d)); changed = true; } return; }
+      const local = arrowCanon(mine);
+      if (local === j || (prev !== undefined && local !== prev)) return; // ours coming back, or an unsent local edit that wins
+      mine.from = d.from; mine.to = d.to; if (d.label) mine.label = d.label; else delete mine.label; changed = true; // a name or direction changed elsewhere
     });
     if (changed) SW.canvas.drawWires();
   }

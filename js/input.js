@@ -249,14 +249,16 @@
       startDrag(e, sh, (ev) => {
         if (ev.shiftKey || ev.metaKey || ev.ctrlKey) { C.select(id, true); return; }
         if (!only) { C.select(id); return; }
-        if (onText || S.isText(S.get(id))) C.editBody(id);
+        const n = S.get(id);
+        if (onText || (S.isText(n) && !S.isImage(n))) C.editBody(id); // a picture edits only from its caption
       });
     });
     layer.addEventListener('dblclick', (e) => {
       const sh = e.target.closest('.shell'); if (!sh || e.target.closest('button')) return;
       const id = sh.dataset.id;
-      if (e.target.closest('textarea.t')) C.focusShell(id, 'title');
-      else if (S.isText(S.get(id)) || e.target.closest('.md')) C.editBody(id);
+      if (e.target.closest('.pic-frame')) SW.images.view(id);
+      else if (e.target.closest('textarea.t')) C.focusShell(id, 'title');
+      else if ((S.isText(S.get(id)) && !S.isImage(S.get(id))) || e.target.closest('.md')) C.editBody(id);
       else C.focusShell(id, 'title');
     });
     layer.addEventListener('click', (e) => {
@@ -290,12 +292,18 @@
     });
     secLayer.addEventListener('dblclick', (e) => { const l = e.target.closest('.section-label'); if (l) C.renameSection(l.parentElement.dataset.sid); });
 
-    wireLayer.addEventListener('pointerdown', (e) => {
-      const g = e.target.closest('g[data-id]'); if (!g || panning(e)) return;
-      e.stopPropagation(); C.selected.clear(); C.els.forEach((el) => el.classList.remove('selected'));
-      C.selArrow = g.dataset.id; C.drawWires(); C.placeSelBar();
-      SW.ui.toast('화살표를 골랐어요', '삭제', () => { if (C.selArrow) C.deleteSelected(); });
-    });
+    /* arrows: click selects (a bar offers name / flip / delete), double-click names the relation */
+    const pickArrow = (e) => {
+      const g = e.target.closest('g[data-id], .wire-label'); if (!g || panning(e)) return;
+      e.stopPropagation(); const ae = document.activeElement; if (ae && layer.contains(ae)) ae.blur();
+      C.selectArrow(g.dataset.id);
+    };
+    const nameArrow = (e) => { const g = e.target.closest('g[data-id], .wire-label'); if (!g) return; e.stopPropagation(); C.editArrowLabel(g.dataset.id); };
+    wireLayer.addEventListener('pointerdown', pickArrow);
+    wireLayer.addEventListener('dblclick', nameArrow);
+    const labelLayer = $('#wireLabels');
+    labelLayer.addEventListener('pointerdown', (e) => { if (e.target.classList.contains('wire-label')) pickArrow(e); });
+    labelLayer.addEventListener('dblclick', (e) => { if (e.target.classList.contains('wire-label')) nameArrow(e); });
 
     /* background: box-select with the mouse, pan with touch / space / middle button / hand tool */
     const pts = new Map(); let pan = null, pinch = null, box = null;
@@ -303,7 +311,7 @@
     const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
     vp.addEventListener('pointerdown', (e) => {
       if (e.button === 2) return;
-      const onNode = e.target.closest('.shell') || e.target.closest('g[data-id]');
+      const onNode = e.target.closest('.shell') || e.target.closest('g[data-id]') || e.target.closest('.wire-label, .wire-input');
       if (onNode && !panning(e)) return;
       SW.ui.closeMenus(); SW.motion.stopCamera();
       const ae = document.activeElement; if (ae && layer.contains(ae)) ae.blur();
@@ -356,7 +364,7 @@
     };
     vp.addEventListener('pointerup', endPtr); vp.addEventListener('pointercancel', endPtr);
     vp.addEventListener('dblclick', (e) => {
-      if (e.target.closest('.shell') || e.target.closest('g[data-id]')) return;
+      if (e.target.closest('.shell') || e.target.closest('g[data-id]') || e.target.closest('.wire-label, .wire-input')) return;
       C.addText(C.toWorld(e.clientX, e.clientY));
     });
     vp.addEventListener('wheel', (e) => {
@@ -371,20 +379,27 @@
     window.addEventListener('keydown', (e) => { if (e.code === 'Space' && !typingNow() && !(SW.present && SW.present.on)) { if (!I.space) { I.space = true; vp.classList.add('hand'); } e.preventDefault(); } });
     window.addEventListener('keyup', (e) => { if (e.code === 'Space') { I.space = false; vp.classList.toggle('hand', C.tool === 'hand'); } });
 
-    /* AI answers and photos dragged onto the canvas */
+    /* AI answers, pictures and text files dragged onto the canvas */
     const MIME = 'application/x-shellwork';
     const hasFiles = (e) => [...e.dataTransfer.types].includes('Files');
+    const shellUnder = (e) => { const hit = nodeAt(e.clientX, e.clientY); return hit && hit.el && !S.isText(S.get(hit.el.dataset.id)) ? hit.el : null; };
     vp.addEventListener('dragover', (e) => {
       const ours = [...e.dataTransfer.types].includes(MIME);
       if (!ours && !hasFiles(e)) return;
       e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; unmark();
-      if (!ours) return;
-      const hit = nodeAt(e.clientX, e.clientY); if (hit && hit.el && !S.isText(S.get(hit.el.dataset.id))) hit.el.classList.add('drop-into');
+      const t = shellUnder(e); if (t) t.classList.add('drop-into');
     });
     vp.addEventListener('dragleave', (e) => { if (e.target === vp) unmark(); });
     vp.addEventListener('drop', (e) => {
-      const photos = [...(e.dataTransfer.files || [])].filter((f) => f.type.indexOf('image/') === 0);
-      if (photos.length) { e.preventDefault(); unmark(); SW.ai.photo(photos, C.toWorld(e.clientX, e.clientY)); return; }
+      const files = [...(e.dataTransfer.files || [])];
+      const photos = files.filter((f) => f.type.indexOf('image/') === 0);
+      if (photos.length) { // a picture goes in as it is; dropped on a shell it goes inside
+        e.preventDefault(); const t = shellUnder(e); unmark();
+        SW.images.insertFiles(photos, C.toWorld(e.clientX, e.clientY), t ? t.dataset.id : null); return;
+      }
+      const doc = files.find((f) => SW.main.isTextFile(f));
+      if (doc) { e.preventDefault(); unmark(); SW.main.importFile(doc); return; }
+      if (files.length) { e.preventDefault(); unmark(); SW.ui.toast('사진, .md, .txt 파일을 넣을 수 있어요'); return; }
       const raw = e.dataTransfer.getData(MIME); if (!raw) return;
       e.preventDefault(); unmark();
       let trees; try { trees = JSON.parse(raw); } catch (err) { return; }

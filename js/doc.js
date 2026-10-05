@@ -21,6 +21,14 @@
     if (!S.count()) body.append(mk('p', 'empty', '아직 셸이 없어요. 아래 버튼이나 캔버스 더블클릭으로 시작하세요.'));
     const depth = (s) => { let d = 0, p = s.parent; while (p) { if (!S.isText(S.get(p))) d++; p = S.get(p).parent; } return d; };
     S.walk((s) => {
+      if (S.isImage(s)) { // a figure: the picture with its caption, which can be edited here too
+        const sec = mk('section', 'sec fig'); sec.id = 'sec-' + s.id; sec.dataset.id = s.id;
+        const fig = mk('figure', SW.images.url(s.img) ? '' : 'loading'), im = mk('img');
+        im.dataset.img = s.img || ''; im.alt = s.body.trim() || '그림'; im.style.aspectRatio = '1 / ' + (s.ratio || 0.75);
+        if (SW.images.url(s.img)) im.src = SW.images.url(s.img); else SW.images.fetch(s.img);
+        const cap = editable(mk('figcaption', 'p', s.body)); cap.dataset.f = 'body'; cap.dataset.ph = '그림 설명';
+        fig.append(im, cap); sec.append(fig); body.append(sec); return;
+      }
       const sec = mk('section', 'sec' + (S.isText(s) ? ' note' : '')); sec.id = 'sec-' + s.id; sec.dataset.id = s.id;
       if (!S.isText(s)) {
         const d = depth(s);
@@ -32,10 +40,10 @@
       p.innerHTML = SW.md(s.body);
       sec.append(p); body.append(sec);
     });
-    const rel = S.board.arrows.filter((x) => S.get(x.from) && S.get(x.to));
+    const rel = S.relations();
     if (rel.length) {
       const box = mk('div', 'relations'); box.append(mk('h3', '', '관계 (캔버스 화살표)'));
-      const ul = mk('ul'); rel.forEach((x) => ul.append(mk('li', '', S.label(S.get(x.from)) + ' → ' + S.label(S.get(x.to)))));
+      const ul = mk('ul'); rel.forEach((r) => ul.append(mk('li', '', r.text)));
       box.append(ul); body.append(box);
     }
     const add = mk('button', 'btn add-sec', '+ 섹션 추가');

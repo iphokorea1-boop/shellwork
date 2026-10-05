@@ -66,17 +66,17 @@
   const part = (el, sel) => el.querySelector(':scope > .shell-body > ' + sel);
 
   function buildNode(id, depth) {
-    const s = S.get(id), text = S.isText(s), kids = s.children.length, shut = s.collapsed && kids && !C.forceOpen;
+    const s = S.get(id), text = S.isText(s), pic = S.isImage(s), kids = s.children.length, shut = s.collapsed && kids && !C.forceOpen;
     const el = document.createElement('div');
-    el.className = 'shell ' + (depth === 0 ? 'root' : 'nested d' + Math.min(depth, 3)) + (text ? ' text' : '') + (shut ? ' collapsed' : '') +
+    el.className = 'shell ' + (depth === 0 ? 'root' : 'nested d' + Math.min(depth, 3)) + (text ? ' text' : '') + (pic ? ' image' : '') + (shut ? ' collapsed' : '') +
       (C.selected.has(id) ? ' selected' : '') + (s.ai ? ' ai' : '') + (SW.ai && SW.ai.busy.has(id) ? ' busy' : '');
     el.dataset.id = id;
-    if (s.color) el.dataset.color = s.color;
-    if (depth === 0) { el.style.left = s.x + 'px'; el.style.top = s.y + 'px'; el.style.width = (s.w || (text ? 340 : 320)) + 'px'; }
+    if (s.color && !pic) el.dataset.color = s.color;
+    if (depth === 0) { el.style.left = s.x + 'px'; el.style.top = s.y + 'px'; el.style.width = (s.w || (pic ? 360 : text ? 340 : 320)) + 'px'; }
     el.innerHTML =
       '<div class="shell-body">' +
-        (text ? '' : '<textarea class="t" rows="1" data-f="title" spellcheck="false"></textarea>') +
-        '<div class="md" data-f="body"></div><textarea class="b" rows="1" data-f="body" hidden></textarea>' +
+        (pic ? '<div class="pic-frame"><img alt="" draggable="false"></div>' : text ? '' : '<textarea class="t" rows="1" data-f="title" spellcheck="false"></textarea>') +
+        '<div class="md' + (pic ? ' cap' : '') + '" data-f="body"></div><textarea class="b' + (pic ? ' cap' : '') + '" rows="1" data-f="body" hidden></textarea>' +
         (s.ai ? '<span class="ai-mark" title="AI가 만든 내용">' + icon('spark') + '</span>' : '') +
       '</div>' +
       (s.src ? '<button class="src-chip" data-act="src">' + icon(s.src.kind === 'photo' ? 'camera' : 'doc') + '<span></span></button>' : '') +
@@ -86,9 +86,16 @@
     if (s.src) el.querySelector(':scope > .src-chip > span').textContent = srcLabel(s.src);
     const ta = part(el, 'textarea.t');
     if (ta) { ta.value = s.title; ta.placeholder = depth ? '소제목' : '제목 없음'; ta.setAttribute('aria-label', '셸 제목'); }
-    const md = part(el, '.md'); md.innerHTML = SW.md(s.body); md.dataset.ph = text ? '글을 입력하세요' : '내용';
-    const tb = part(el, 'textarea.b'); tb.value = s.body; tb.placeholder = text ? '글을 입력하세요' : '내용을 적어 보세요';
-    tb.setAttribute('aria-label', text ? '글' : '셸 내용');
+    const md = part(el, '.md'); md.innerHTML = SW.md(s.body); md.dataset.ph = pic ? '설명을 적어 보세요 (선택)' : text ? '글을 입력하세요' : '내용';
+    const tb = part(el, 'textarea.b'); tb.value = s.body; tb.placeholder = pic ? '그림 설명' : text ? '글을 입력하세요' : '내용을 적어 보세요';
+    tb.setAttribute('aria-label', pic ? '그림 설명' : text ? '글' : '셸 내용');
+    if (pic) {
+      const frame = part(el, '.pic-frame'), im = frame.firstChild;
+      frame.style.aspectRatio = '1 / ' + (s.ratio || 0.75);
+      im.dataset.img = s.img || ''; im.alt = s.body.trim().split('\n')[0] || '그림';
+      const url = SW.images.url(s.img);
+      if (url) im.src = url; else { frame.classList.add('loading'); SW.images.fetch(s.img); }
+    }
     C.els.set(id, el); // parents before children: the motion code relies on this order
     const box = el.querySelector(':scope > .children');
     if (!shut) s.children.forEach((c) => box.appendChild(buildNode(c, depth + 1)));
@@ -145,7 +152,7 @@
     const md = part(el, '.md'), tb = part(el, 'textarea.b');
     md.innerHTML = SW.md(s.body); md.hidden = false; tb.hidden = true; el.classList.remove('editing');
     if (C.editing === id) C.editing = null;
-    if (S.isText(s) && !s.body.trim() && !s.children.length) { // an empty note disappears, like a cancelled sticky
+    if (S.isText(s) && !S.isImage(s) && !s.body.trim() && !s.children.length) { // an empty note disappears, like a cancelled sticky
       if (C.fresh === id) S.undoStack.pop(); else S.checkpoint();
       C.fresh = null; S.remove(id); C.selected.delete(id); S.changed(); return;
     }
@@ -249,14 +256,54 @@
   C.drawWires = () => {
     if (!wireLayer) return;
     wireLayer.textContent = '';
+    const labels = $('#wireLabels'); if (labels) labels.querySelectorAll('.wire-label').forEach((x) => x.remove());
     for (const a of S.board.arrows) {
       if (a.from === a.to) continue;
       const A = C.headRect(a.from), B = C.headRect(a.to); if (!A || !B) continue;
       const d = C.route(A, B), sel = C.selArrow === a.id;
       const g = svgEl('g', { 'data-id': a.id, class: sel ? 'sel' : '' });
-      g.append(svgEl('path', { class: 'hit', d }), svgEl('path', { class: 'wire', d, 'marker-end': 'url(#' + (sel ? 'ah-sel' : 'ah') + ')' }));
+      const wire = svgEl('path', { class: 'wire', d, 'marker-end': 'url(#' + (sel ? 'ah-sel' : 'ah') + ')' });
+      g.append(svgEl('path', { class: 'hit', d }), wire);
       wireLayer.appendChild(g);
+      if (a.label && labels && C.editingArrow !== a.id) { // the relation's name sits on the middle of the line
+        const p = midOf(wire), t = document.createElement('div');
+        t.className = 'wire-label' + (sel ? ' sel' : ''); t.dataset.id = a.id; t.textContent = a.label;
+        t.style.left = p.x + 'px'; t.style.top = p.y + 'px'; labels.append(t);
+      }
     }
+  };
+  const midOf = (path) => { try { const n = path.getTotalLength(); return path.getPointAtLength(n / 2); } catch (e) { return { x: 0, y: 0 }; } };
+  C.arrowMid = (aid) => { const w = wireLayer && wireLayer.querySelector('g[data-id="' + aid + '"] path.wire'); return w ? midOf(w) : null; };
+  C.selectArrow = (aid) => {
+    C.selected.clear(); C.els.forEach((el) => el.classList.remove('selected'));
+    C.selArrow = aid; C.drawWires(); C.selSig = null; C.placeSelBar();
+    if (SW.main && SW.main.markOutline) SW.main.markOutline();
+  };
+  /* name a relation: a small field right on the line */
+  C.editArrowLabel = (aid) => {
+    const a = S.board.arrows.find((x) => x.id === aid), p = C.arrowMid(aid), labels = $('#wireLabels'); if (!a || !p || !labels) return;
+    C.editingArrow = aid; C.drawWires(); $('#selBar').hidden = true;
+    const inp = document.createElement('input'); inp.className = 'wire-input'; inp.value = a.label || ''; inp.placeholder = '예: 원인, 근거, 다음 단계'; inp.maxLength = 30;
+    inp.setAttribute('aria-label', '관계 이름'); inp.style.left = p.x + 'px'; inp.style.top = p.y + 'px';
+    labels.append(inp); inp.focus(); inp.select();
+    let done = false;
+    const finish = (save) => {
+      if (done) return; done = true; C.editingArrow = null; inp.remove();
+      const v = inp.value.replace(/\s+/g, ' ').trim().slice(0, 30);
+      if (save && v !== (a.label || '')) { S.checkpoint(); if (v) a.label = v; else delete a.label; S.changed(); } else C.drawWires();
+      C.selSig = null; C.placeSelBar();
+    };
+    inp.addEventListener('keydown', (e) => {
+      if (e.isComposing || e.keyCode === 229) return;
+      e.stopPropagation();
+      if (e.key === 'Enter') { e.preventDefault(); finish(true); } else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+    });
+    inp.addEventListener('blur', () => finish(true));
+    inp.addEventListener('pointerdown', (e) => e.stopPropagation());
+  };
+  C.flipArrow = (aid) => {
+    const a = S.board.arrows.find((x) => x.id === aid); if (!a) return;
+    S.checkpoint(); const t = a.from; a.from = a.to; a.to = t; S.changed();
   };
 
   /* ---------- selection bar (Arky-style actions above what is selected) ---------- */
@@ -265,18 +312,35 @@
     const bar = $('#selBar'), one = ids.length === 1 ? S.get(ids[0]) : null;
     const btn = (act, label, extra) => '<button data-sel="' + act + '"' + (extra || '') + '>' + label + '</button>';
     let h = '';
-    if (one && !S.isText(one)) h += btn('focus', '집중');
+    if (one && S.isImage(one)) h += btn('view', '크게 보기');
+    else if (one && !S.isText(one)) h += btn('focus', '집중');
     if (one && one.parent) h += btn('out', '밖으로 빼기 ' + kbd(SW.keys.fmt('Shift+Tab')));
     h += btn('wrap', '셸로 감싸기 ' + kbd(SW.keys.fmt('Mod+G')));
     h += btn('chat', 'AI에게 보내기 ' + kbd(SW.keys.fmt('Mod+L')));
-    if (one) h += btn('ai', icon('spark') + ' AI', ' class="ai" title="AI로 발전시키기"');
+    if (one) h += btn('ai', icon('spark') + ' AI', ' class="ai" title="' + (S.isImage(one) ? 'AI로 그림 읽기' : 'AI로 발전시키기') + '"');
     h += btn('more', icon('more'), ' class="icon" title="더보기" aria-label="더보기"');
     bar.innerHTML = h;
+  }
+  function buildArrowBar(a) {
+    const btn = (act, label, extra) => '<button data-arrow="' + act + '"' + (extra || '') + '>' + label + '</button>';
+    $('#selBar').innerHTML = btn('label', (a.label ? '이름 바꾸기 ' : '관계 이름 붙이기 ') + kbd(SW.keys.fmt('Enter'))) + btn('flip', '방향 바꾸기') + btn('del', '삭제 ' + kbd(SW.keys.fmt('Delete')));
   }
   C.placeSelBar = () => {
     const bar = $('#selBar'); if (!bar) return;
     const ids = [...C.selected].filter((id) => C.els.get(id));
-    if (!ids.length || C.dragging || C.selArrow || (SW.present && SW.present.on) || !vp || vp.offsetParent === null) { bar.hidden = true; return; }
+    const arrow = C.selArrow && !C.editingArrow ? S.board.arrows.find((a) => a.id === C.selArrow) : null;
+    if ((!ids.length && !arrow) || C.dragging || (SW.present && SW.present.on) || !vp || vp.offsetParent === null) { bar.hidden = true; return; }
+    if (arrow) { // a relation line is selected: name it, flip it, delete it
+      const p = C.arrowMid(arrow.id); if (!p) { bar.hidden = true; return; }
+      const sig = 'arrow:' + arrow.id + ':' + (arrow.label || '');
+      if (sig !== C.selSig) { C.selSig = sig; buildArrowBar(arrow); }
+      bar.hidden = false;
+      const vr = vp.getBoundingClientRect(), sr = bar.parentElement.getBoundingClientRect();
+      const sx = vr.left + C.view.x + p.x * C.view.k, sy = vr.top + C.view.y + p.y * C.view.k;
+      bar.style.left = clamp(sx - sr.left - bar.offsetWidth / 2, 8, sr.width - bar.offsetWidth - 8) + 'px';
+      bar.style.top = Math.max(58, sy - sr.top - bar.offsetHeight - 16) + 'px';
+      return;
+    }
     const sig = ids.join(',');
     if (sig !== C.selSig) { C.selSig = sig; buildSelBar(ids); }
     bar.hidden = false;
@@ -352,8 +416,9 @@
     S.checkpoint();
     const copy = (sid, parent, index, pos) => {
       const o = S.get(sid);
-      const n = S.add({ kind: o.kind, title: o.title, body: o.body, ai: o.ai, w: o.w, color: o.color, collapsed: o.collapsed, x: pos ? pos.x : 0, y: pos ? pos.y : 0 }, parent, index);
+      const n = S.add({ kind: o.kind, title: o.title, body: o.body, ai: o.ai, w: o.w, color: o.color, collapsed: o.collapsed, img: o.img, ratio: o.ratio, x: pos ? pos.x : 0, y: pos ? pos.y : 0 }, parent, index);
       if (!o.kind) delete n.kind;
+      if (!o.img) { delete n.img; delete n.ratio; }
       o.children.forEach((c) => copy(c, n.id)); return n;
     };
     const s = S.get(id);
@@ -410,6 +475,44 @@
     return n;
   };
 
+  /* a blank 3 × 3 table at the end of the body, opened for typing */
+  C.insertTable = (id) => {
+    const s = S.get(id); if (!s) return;
+    const NL = String.fromCharCode(10);
+    const t = ['| 항목 | 값 1 | 값 2 |', '| --- | --- | --- |', '|  |  |  |', '|  |  |  |'].join(NL);
+    S.checkpoint(); s.body = (s.body.trim() ? s.body.replace(/\s+$/, '') + NL + NL : '') + t; S.changed();
+    C.editBody(id);
+    SW.ui.toast('표를 넣었어요. 칸은 | 로 나뉘어요');
+  };
+  /* where new content can go without covering anything: below what is already on the canvas */
+  C.freeSpot = (skip) => {
+    const rest = S.board.roots.filter((id) => !(skip || []).includes(id) && C.els.get(id));
+    if (!rest.length) return { x: 80, y: 80 };
+    let x0 = Infinity, y1 = -Infinity;
+    rest.forEach((id) => { const s = S.get(id), el = C.els.get(id); x0 = Math.min(x0, s.x); y1 = Math.max(y1, s.y + el.offsetHeight); });
+    return { x: Math.round(x0), y: Math.round(y1 + 120) };
+  };
+  /* lay roots out in reading order: rows of up to `cols`, each row below the tallest item of the one before */
+  C.layoutRows = (ids, origin, cols) => {
+    cols = cols || 3; let y = origin.y;
+    for (let i = 0; i < ids.length; i += cols) {
+      const row = ids.slice(i, i + cols).filter((id) => S.get(id) && C.els.get(id)); let x = origin.x, h = 0;
+      row.forEach((id) => {
+        const s = S.get(id), el = C.els.get(id);
+        s.x = Math.round(x); s.y = Math.round(y); el.style.left = s.x + 'px'; el.style.top = s.y + 'px';
+        x += (s.w || el.offsetWidth) + 56; h = Math.max(h, el.offsetHeight);
+      });
+      y += h + 72;
+    }
+    C.drawWires(); C.updateOrder(); C.placeSelBar(); SW.persist.schedule();
+  };
+  C.frameIds = (ids) => {
+    const rs = ids.filter((i) => C.els.get(i)).map((i) => C.worldRect(C.els.get(i))); if (!rs.length) return;
+    const x0 = Math.min(...rs.map((r) => r.x)), y0 = Math.min(...rs.map((r) => r.y));
+    const x1 = Math.max(...rs.map((r) => r.x + r.w)), y1 = Math.max(...rs.map((r) => r.y + r.h));
+    SW.motion.camera(C.frameTarget({ x: x0 - 40, y: y0 - 40, w: x1 - x0 + 80, h: y1 - y0 + 80 }, { maxK: 1 }));
+  };
+
   C.colorMenu = (id, anchor) => {
     const s = S.get(id);
     SW.ui.openMenu(anchor, [{ heading: '색' }, { swatches: C.COLORS, value: s.color || '', act: (c) => {
@@ -418,12 +521,14 @@
   };
   C.moreMenu = (anchor) => {
     const ids = [...C.selected].filter((i) => S.get(i)); if (!ids.length) return;
-    const id = ids[0], s = S.get(id), one = ids.length === 1;
-    const items = [{ heading: '색' }, { swatches: C.COLORS, value: s.color || '', act: (c) => {
-      S.checkpoint(); ids.forEach((i) => { const n = S.get(i); if (c) n.color = c; else delete n.color; }); S.changed();
+    const id = ids[0], s = S.get(id), one = ids.length === 1, pic = S.isImage(s);
+    const items = pic && one ? [] : [{ heading: '색' }, { swatches: C.COLORS, value: s.color || '', act: (c) => {
+      S.checkpoint(); ids.forEach((i) => { const n = S.get(i); if (S.isImage(n)) return; if (c) n.color = c; else delete n.color; }); S.changed();
     } }, '-'];
-    if (one && !S.isText(s)) items.push({ label: '안에 글 추가', act: () => C.addText(null, id) }, { label: '하위 셸 추가', act: () => C.addChild(id) });
-    if (one) items.push({ label: S.isText(s) ? '셸로 바꾸기 (첫 줄이 제목)' : '글로 바꾸기', act: () => C.convert(id) });
+    if (one && pic) items.push({ label: '크게 보기', act: () => SW.images.view(id) }, { label: s.body.trim() ? '설명 고치기' : '설명 쓰기', act: () => C.editBody(id) });
+    if (one && !S.isText(s)) items.push({ label: '안에 글 추가', act: () => C.addText(null, id) }, { label: '하위 셸 추가', act: () => C.addChild(id) }, { label: '안에 사진 넣기', act: () => SW.main.pickImages(id) });
+    if (one && !pic) items.push({ label: '표 넣기', act: () => C.insertTable(id) });
+    if (one && !pic) items.push({ label: S.isText(s) ? '셸로 바꾸기 (첫 줄이 제목)' : '글로 바꾸기', act: () => C.convert(id) });
     if (one && s.parent) items.push({ label: '한 단계 밖으로 빼기', meta: '⇧Tab', act: () => C.outdent(id) });
     if (one && s.children.length) items.push({ label: s.collapsed ? '하위 펼치기' : '하위 접기', act: () => { S.checkpoint(); s.collapsed = !s.collapsed; S.changed(); } });
     if (one) items.push({ label: '복제', act: () => C.duplicate(id) });
@@ -532,10 +637,17 @@
   C.init = () => {
     vp = $('#viewport'); world = $('#world'); layer = $('#shellLayer'); wireLayer = $('#wireLayer'); tempWire = $('#tempWire');
     $('#selBar').addEventListener('click', (e) => {
+      const ab = e.target.closest('button[data-arrow]');
+      if (ab && C.selArrow) {
+        const aid = C.selArrow, act = ab.dataset.arrow;
+        if (act === 'label') C.editArrowLabel(aid); else if (act === 'flip') C.flipArrow(aid); else C.deleteSelected();
+        return;
+      }
       const b = e.target.closest('button[data-sel]'); if (!b) return;
       const ids = [...C.selected].filter((i) => S.get(i)); if (!ids.length) return;
       const act = b.dataset.sel;
-      if (act === 'focus') C.focus(ids[0]);
+      if (act === 'view') SW.images.view(ids[0]);
+      else if (act === 'focus') C.focus(ids[0]);
       else if (act === 'wrap') C.wrapSelection();
       else if (act === 'chat') SW.ai.attach(ids);
       else if (act === 'ai') SW.ai.openShellMenu(ids[0], b);

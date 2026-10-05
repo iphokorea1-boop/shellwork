@@ -401,7 +401,143 @@
 /* on phones the photo button leads: snap a page of notes and upload it */
 @media (max-width: 640px) {
   .dock-btn.photo-cta { width: auto; padding: 0 12px; background: var(--ink); color: var(--on-ink); }
-  .dock-btn.photo-cta::after { content: "사진 올리기"; font-size: 12.5px; font-weight: 600; }
+  .dock-btn.photo-cta::after { content: "사진"; font-size: 12.5px; font-weight: 600; }
+}
+
+/* ---------- pictures: a photo with a caption, on the canvas or inside a shell ---------- */
+.shell.image.root { padding: 8px; border-radius: 14px; background: var(--sheet); box-shadow: 0 0 0 1px var(--edge), var(--lift); }
+.shell.image.root:hover { box-shadow: 0 0 0 1px var(--hover-edge), var(--lift); }
+.shell.image.root.selected, .shell.image.root.selected:hover { box-shadow: 0 0 0 1.5px var(--accent), 0 0 0 5px var(--accent-soft), var(--lift); }
+.shell.image.nested { padding: 0; margin: 2px 0; margin-inline: 0; border-radius: 9px; }
+.pic-frame { position: relative; width: 100%; border-radius: 8px; overflow: hidden; background: var(--panel); }
+.shell.image.nested .pic-frame { border-radius: 9px; }
+.pic-frame img { display: block; width: 100%; height: 100%; object-fit: cover; -webkit-user-drag: none; -webkit-user-select: none; user-select: none; }
+.pic-frame.loading::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(100deg, transparent 30%, var(--shimmer) 50%, transparent 70%); background-size: 220% 100%; animation: shimmer 1.4s linear infinite;
+}
+.pic-frame.missing::after { content: "그림을 불러오지 못했어요"; position: absolute; inset: 0; display: grid; place-items: center; font-size: 12px; color: var(--muted); }
+.shell.image .md.cap, .shell.image textarea.cap { margin-top: 7px; padding: 0 4px 2px; font-size: 12.5px; line-height: 1.55; color: var(--ink-2); }
+.shell.image:not(.selected) > .shell-body > .md.cap:empty { display: none; }
+.shell.image.lifted, .shell.image.drag-clone { background: var(--sheet); padding: 8px; border-radius: 14px; }
+
+/* ---------- tables, in shells and in documents ---------- */
+.md .tbl { margin: 6px 0; }
+.md table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12.5px; line-height: 1.45; }
+.md th, .md td { padding: 5px 8px; border: 1px solid var(--rule-2); text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+.md th { background: var(--panel); font-weight: 600; color: var(--ink); }
+.md td { color: var(--ink-2); }
+.shell[data-color] .md th { background: rgba(255, 255, 255, .5); }
+.doc .p .tbl { margin: .6em 0 1em; }
+.doc .p table, .write-out table { font-size: 14px; line-height: 1.55; }
+.doc .p th, .doc .p td, .write-out th, .write-out td { padding: 7px 11px; }
+.doc .sec.fig figure { margin: 1.6em 0 1.4em; }
+.doc figure img { display: block; max-width: 100%; height: auto; margin: 0 auto; border-radius: 10px; box-shadow: 0 0 0 1px var(--rule); }
+.doc figure.loading img { width: 100%; background: var(--panel); }
+.doc figcaption.p { margin: .7em 0 0; text-align: center; font-size: 13.5px; line-height: 1.6; color: var(--ink-2); }
+
+/* ---------- relation names on arrows ---------- */
+.wire-labels { position: absolute; left: 0; top: 0; width: 0; height: 0; }
+.wire-label {
+  position: absolute; transform: translate(-50%, -50%); padding: 2px 9px; border-radius: 999px; white-space: nowrap; cursor: pointer;
+  background: var(--canvas); box-shadow: inset 0 0 0 1px var(--rule-2); font-size: 11.5px; font-weight: 600; line-height: 18px; color: var(--ink-2);
+  -webkit-user-select: none; user-select: none;
+}
+.wire-label:hover { color: var(--ink); box-shadow: inset 0 0 0 1px var(--hover-edge); }
+.wire-label.sel { background: var(--sheet); color: var(--accent); box-shadow: inset 0 0 0 1.5px var(--accent); }
+.wire-input {
+  position: absolute; z-index: 5; transform: translate(-50%, -50%); width: 168px; height: 28px; padding: 0 12px; border: 0; border-radius: 999px;
+  background: var(--sheet); box-shadow: 0 0 0 1.5px var(--accent), 0 0 0 5px var(--accent-soft), var(--shadow-2);
+  font: 600 12.5px var(--f-ui); color: var(--ink); text-align: center; outline: none;
+}
+.app.presenting .wire-labels { opacity: .45; }
+
+/* ---------- import, writing and PowerPoint dialogs ---------- */
+.modal-card.wide { width: min(880px, 100%); }
+.modal-card.wide textarea { min-height: 280px; font: 13.5px/1.7 var(--f-ui); }
+.modal-card.drop-file { box-shadow: 0 0 0 2px var(--accent), var(--shadow-3); }
+.import-head, .write-box, .ppt-box, .ppt-opts { display: flex; flex-direction: column; gap: 10px; }
+.import-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.file-chip { min-width: 0; padding: 3px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg[hidden] { display: none; }
+.seg-btn {
+  flex: 1 1 0; min-width: 120px; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 9px 12px;
+  border: 0; border-radius: 11px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--rule); text-align: left; color: var(--ink-2);
+}
+.seg-btn:hover { box-shadow: inset 0 0 0 1px var(--rule-2); }
+.seg-label { font-size: 13px; font-weight: 600; color: var(--ink); }
+.seg-sub { font-size: 11.5px; line-height: 1.4; color: var(--muted); }
+.seg-btn[aria-checked="true"] { background: var(--sheet); box-shadow: inset 0 0 0 1.5px var(--accent), 0 0 0 3px var(--accent-soft); }
+.seg-btn.off { opacity: .55; }
+.modal-card input.req {
+  height: 36px; padding: 0 12px; border: 0; border-radius: 10px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--rule-2);
+  font: 13px var(--f-ui); color: var(--ink);
+}
+.modal-card input.req[hidden] { display: none; }
+.modal-card input.req:focus { outline: none; box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 3px var(--accent-ring); }
+.write-empty { margin: 0; font-size: 13px; color: var(--muted); }
+.write-empty.thinking { animation: pulse 1.4s ease-in-out infinite; }
+.write-out {
+  height: min(50vh, 520px); overflow: auto; padding: 24px 30px; border-radius: 12px; background: var(--sheet); box-shadow: inset 0 0 0 1px var(--rule);
+  font-size: 14.5px; line-height: 1.75; color: var(--ink);
+}
+.write-out h2, .write-out h3, .write-out h4, .write-out h5 { margin: 1.4em 0 .4em; line-height: 1.35; letter-spacing: -.02em; }
+.write-out h2.mh1 { margin-top: 0; font-size: 23px; font-weight: 750; }
+.write-out h3.mh2 { font-size: 18px; font-weight: 700; }
+.write-out h4.mh3 { font-size: 15.5px; font-weight: 650; }
+.write-out h5.mh4 { font-size: 14.5px; font-weight: 650; color: var(--ink-2); }
+.write-out p { margin: 0; }
+.write-out p.gap { height: .75em; }
+.write-out ul, .write-out ol { margin: .2em 0; padding-left: 1.4em; }
+.write-out li.sub { margin-left: 1.2em; list-style-type: circle; }
+.write-out .tbl { margin: .6em 0 1em; }
+.wfig { margin: 1em 0; text-align: center; }
+.wfig img { max-width: 100%; max-height: 320px; border-radius: 8px; box-shadow: 0 0 0 1px var(--rule); }
+.wfig figcaption { margin-top: 6px; font-size: 12.5px; color: var(--ink-2); }
+.fig-missing { color: var(--muted); font-size: 12.5px; }
+.deck-preview { max-height: min(52vh, 520px); overflow: auto; padding: 2px; }
+.deck-sum { margin: 0 0 12px !important; }
+.deck-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); gap: 14px; }
+.slide-thumb { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.slide-face {
+  aspect-ratio: 16 / 9; display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; overflow: hidden; border-radius: 8px;
+  background: #fff; box-shadow: 0 0 0 1px var(--rule-2), var(--shadow-1); color: #1D1D1F;
+}
+.slide-mark { display: block; flex: none; width: 14px; height: 2px; border-radius: 1px; background: #2D6BF6; }
+.slide-face strong { font-size: 10.5px; font-weight: 700; line-height: 1.3; }
+.slide-line { overflow: hidden; font-size: 8px; line-height: 1.45; color: #48484A; white-space: nowrap; text-overflow: ellipsis; }
+.slide-line::before { content: "•  "; color: #8E8E93; }
+.slide-face img { flex: 1; min-height: 0; width: 100%; object-fit: contain; }
+.slide-tag { margin-top: auto; align-self: flex-start; padding: 2px 6px; border-radius: 4px; background: #F2F4F8; font-size: 8.5px; color: #6E6E73; }
+.slide-sub { font-size: 8.5px; color: #6E6E73; }
+.t-cover .slide-face, .t-section .slide-face { justify-content: center; }
+.t-cover .slide-face strong { font-size: 13px; }
+.t-section .slide-face { background: #F5F5F7; }
+.t-section .slide-face strong { font-size: 12.5px; }
+.t-closing .slide-face { justify-content: center; align-items: center; text-align: center; }
+.t-closing .slide-face strong { font-size: 13px; }
+.slide-foot { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+.slide-foot b { font-weight: 600; }
+.slide-notes { margin-left: auto; padding: 0 6px; border-radius: 5px; background: var(--ai-soft); color: var(--ai-ink); font-size: 10.5px; font-weight: 600; line-height: 17px; }
+.doc-pending .doc-ic { flex: none; width: 58px; height: 58px; display: grid; place-items: center; border-radius: 9px; background: var(--accent-soft); color: var(--accent); }
+.doc-pending .doc-ic svg { width: 26px; height: 26px; }
+.tp-badge.table { background: var(--accent-soft); color: var(--accent); }
+.tp-badge.link { background: var(--hover); color: var(--ink-2); }
+.tp-head { margin: 12px 0 4px; font-size: 11.5px; font-weight: 600; color: var(--muted); }
+.tree-preview ul.tp-links { list-style: disc; padding-left: 18px; color: var(--ink-2); }
+@media (max-width: 640px) {
+  .seg-btn { min-width: 100%; }
+  .write-out { padding: 18px; }
+}
+@supports (corner-shape: squircle) {
+  .pic-frame, .seg-btn, .slide-face, .write-out, .wire-input, .modal-card input.req { corner-shape: squircle; }
+  .shell.image.root { border-radius: 19px; }
+  .pic-frame { border-radius: 11px; }
+  .seg-btn { border-radius: 15px; }
+  .slide-face { border-radius: 11px; }
+  .write-out { border-radius: 16px; }
+  .modal-card input.req { border-radius: 13px; }
 }
 
 /* ---------- Apple-style continuous corners ----------

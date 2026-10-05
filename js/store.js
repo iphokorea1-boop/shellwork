@@ -1,7 +1,8 @@
 /* Shellwork — data model.
  * A board is a forest of nodes. A shell = heading (title) + paragraph (body) + children.
  * A text block (kind: 'text') is a loose piece of writing with no heading: notes dumped on the canvas
- * that later get wrapped into shells. Root nodes sit on the canvas at (x, y); nested ones live inside their parent.
+ * that later get wrapped into shells. A picture (kind: 'image') is the same kind of loose piece: an image id (img), its
+ * shape (ratio = height / width) and a caption in body. Root nodes sit on the canvas at (x, y); nested ones live inside their parent.
  * The canvas and the document view are two renderings of this same tree. */
 window.SW = window.SW || {};
 (function (SW) {
@@ -22,7 +23,9 @@ window.SW = window.SW || {};
 
   /* ---------- tree helpers ---------- */
   S.get = (id) => S.board.shells[id];
-  S.isText = (s) => !!s && s.kind === 'text';
+  /* text blocks and pictures are content, not headings: they never count as a heading level */
+  S.isText = (s) => !!s && (s.kind === 'text' || s.kind === 'image');
+  S.isImage = (s) => !!s && s.kind === 'image';
   S.count = () => Object.keys(S.board.shells).length;
   S.depth = (id) => { let d = 0, s = S.get(id); while (s && s.parent) { d++; s = S.get(s.parent); } return d; };
   S.isAncestor = (a, b) => { let s = S.get(b); while (s) { if (s.id === a) return true; s = s.parent ? S.get(s.parent) : null; } return false; };
@@ -127,20 +130,33 @@ window.SW = window.SW || {};
   S.toMarkdown = () => {
     const out = ['# ' + S.board.name, ''];
     S.walk((s, d) => {
+      if (S.isImage(s)) { out.push('*[그림] ' + (s.body.trim().replace(/\s*\n\s*/g, ' ') || '설명 없음') + '*', ''); return; }
       if (S.isText(s)) { if (s.body.trim()) out.push(s.body.trim(), ''); return; }
       out.push('#'.repeat(Math.min(6, d + 2)) + ' ' + (s.title.trim() || '(제목 없음)'), '');
       if (s.body.trim()) out.push(s.body.trim(), '');
     });
-    const rel = S.board.arrows.filter((a) => S.get(a.from) && S.get(a.to));
+    const rel = S.relations();
     if (rel.length) {
       out.push('## 관계', '');
-      rel.forEach((a) => out.push('- ' + S.label(S.get(a.from)) + ' → ' + S.label(S.get(a.to))));
+      rel.forEach((r) => out.push('- ' + r.text));
       out.push('');
     }
     return out.join('\n');
   };
-  /* a short name for any node: the shell title, or the first line of a text block */
-  S.label = (s) => (S.isText(s) ? s.body.trim().split('\n')[0].replace(/^[-*•]\s+|^\d+[.)]\s+|^#+\s+/, '').slice(0, 40) : s.title.trim()) || '(제목 없음)';
+  /* a short name for any node: the shell title, the first line of a text block, or a picture's caption */
+  S.label = (s) => (S.isImage(s) ? '그림' + (s.body.trim() ? ': ' + s.body.trim().split('\n')[0].slice(0, 36) : '')
+    : S.isText(s) ? s.body.trim().split('\n')[0].replace(/^[-*•]\s+|^\d+[.)]\s+|^#+\s+/, '').slice(0, 40) : s.title.trim()) || '(제목 없음)';
+  /* the arrows as readable lines: "가설 → 측정 방법 (검증)" */
+  S.relations = () => S.board.arrows.filter((a) => S.get(a.from) && S.get(a.to)).map((a) => ({
+    a, text: S.label(S.get(a.from)) + ' → ' + S.label(S.get(a.to)) + (a.label ? ' (' + a.label + ')' : ''),
+  }));
+  /* image ids used anywhere in these node trees (or the whole board) */
+  S.imageIds = (ids) => {
+    const out = new Set();
+    const walk = (id) => { const s = S.get(id); if (!s) return; if (S.isImage(s) && s.img) out.add(s.img); s.children.forEach(walk); };
+    (ids || S.board.roots).forEach(walk);
+    return [...out];
+  };
 
   /* ---------- text in → node trees {kind?, title, body, children} ----------
    * Like dumping notes on a desk: headings become shells, everything else lands as loose text blocks. */
@@ -174,7 +190,10 @@ window.SW = window.SW || {};
     const made = [];
     const addTree = (n, parent, pos) => {
       const f = { body: n.body || '', ai: !!n.ai, x: pos ? pos.x : 0, y: pos ? pos.y : 0 };
-      if (n.kind === 'text') { f.kind = 'text'; f.w = 340; } else f.title = n.title || '';
+      if (n.kind === 'text') { f.kind = 'text'; f.w = 340; }
+      else if (n.kind === 'image') { f.kind = 'image'; f.img = n.img; f.ratio = n.ratio || 0.75; f.w = n.w || 360; }
+      else { f.title = n.title || ''; if (n.w) f.w = n.w; }
+      if (n.color) f.color = n.color;
       const s = S.add(f, parent);
       (n.children || []).forEach((c) => addTree(c, s.id));
       return s;
@@ -206,14 +225,14 @@ window.SW = window.SW || {};
     const prev = S.board, NL = String.fromCharCode(10); S.board = S.emptyBoard('예시 · 운동장 표면 온도 탐구');
     const q = S.add({ title: '연구 질문', body: '학교 운동장의 **인조잔디**와 **흙 바닥**은 한낮 표면 온도가 얼마나 다를까?', x: 80, y: 90, w: 320, color: 'sky' });
     const h = S.add({ title: '가설', body: '인조잔디가 정오에 흙보다 10°C 이상 뜨거울 것이다.' }, q.id);
-    S.add({ title: '변인', body: ['- **독립:** 바닥 재질', '- **종속:** 표면 온도', '- **통제:** 측정 시각, 날씨, 측정 높이'].join(NL) }, q.id);
+    S.add({ title: '변인', body: ['| 구분 | 변인 |', '| --- | --- |', '| 독립 | 바닥 재질 |', '| 종속 | 표면 온도 |', '| 통제 | 측정 시각, 날씨, 측정 높이 |'].join(NL) }, q.id);
     const m = S.add({ title: '측정 방법', body: ['1. 적외선 온도계로 9시 · 12시 · 15시에 측정', '2. 재질별로 5곳씩, 높이 1m에서', '3. 맑은 날 3일 반복'].join(NL), x: 500, y: 80, w: 320 });
     S.add({ title: '준비물', body: '적외선 온도계, 기록지, 그늘막 위치 사진' }, m.id);
     const g = S.add({ title: '그래프 아이디어', body: '시간대별 온도 꺾은선 그래프, 재질별로 색 구분', x: 500, y: 470, w: 300 });
     S.add({ kind: 'text', body: ['- 선행 연구: 인조잔디 열섬 논문 2~3편', '- 측정 높이를 어떻게 정했는지 확인하기'].join(NL), x: 90, y: 520, w: 330 });
     S.add({ kind: 'text', body: '열화상 사진 한 장이 숫자 표보다 설득력 있을 듯. 발표 첫 화면에 쓰기?', x: 900, y: 120, w: 300 });
     S.add({ kind: 'text', body: '흐린 날은 차이가 줄어들 수 있음 → 날씨도 기록', x: 900, y: 300, w: 280 });
-    S.board.arrows.push({ id: uid('a'), from: h.id, to: m.id }, { id: uid('a'), from: m.id, to: g.id });
+    S.board.arrows.push({ id: uid('a'), from: h.id, to: m.id, label: '검증' }, { id: uid('a'), from: m.id, to: g.id, label: '정리' });
     S.board.example = true;
     const b = S.board; S.board = prev; return b;
   };
